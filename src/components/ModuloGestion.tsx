@@ -3,10 +3,12 @@ import { useApp } from '../context/AppContext';
 import { Hito } from '../types';
 import { Plus, Download, Upload, CheckCircle, Circle, FileText, Calendar } from 'lucide-react';
 import { FormularioHito } from './FormularioHito';
+import { Pencil } from 'lucide-react';
+import { EstadoProyecto } from '../types';
 
 export function ModuloGestion() {
-  const { proyectos, hitos, aportes, agregarHito, toggleHito } = useApp();
-
+ const { proyectos, hitos, aportes, agregarHito, toggleHito, cambiarEstadoProyecto } = useApp();
+ const [mostrarCambioEstado, setMostrarCambioEstado] = useState(false);
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<string>(
     proyectos[0]?.id ?? ''
   );
@@ -50,18 +52,60 @@ export function ModuloGestion() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-gray-900">Gestión y Trazabilidad</h2>
-          <p className="text-gray-600">Seguimiento transparente de proyectos y uso de fondos</p>
+  <div>
+    <h2 className="text-gray-900">Gestión y Trazabilidad</h2>
+    <p className="text-gray-600">Seguimiento transparente de proyectos y uso de fondos</p>
+  </div>
+
+  <div className="flex items-center gap-3">
+    {/* Botón Cambiar Estado */}
+    <div className="relative">
+      <button
+        onClick={() => setMostrarCambioEstado(v => !v)}
+        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+      >
+        <Pencil className="w-4 h-4" />
+        Cambiar estado
+      </button>
+
+      {mostrarCambioEstado && (
+        <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-20 w-56">
+          <label className="block text-xs text-gray-600 mb-2">Nuevo estado</label>
+          <select
+            value={proyecto.estado}
+            onChange={(e) => {
+              cambiarEstadoProyecto(proyecto.id, e.target.value as EstadoProyecto);
+              setMostrarCambioEstado(false);
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            <option value="registrado">Registrado</option>
+            <option value="validado">Validado</option>
+            <option value="en_espera">En espera</option>
+            <option value="activo">Activo</option>
+            <option value="finalizado">Finalizado</option>
+          </select>
+
+          <button
+            onClick={() => setMostrarCambioEstado(false)}
+            className="mt-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+          >
+            Cancelar
+          </button>
         </div>
-        <button
-          onClick={descargarReporte}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-        >
-          <Download className="w-5 h-5" />
-          Descargar Reporte
-        </button>
-      </div>
+      )}
+    </div>
+
+    {/* Botón Descargar Reporte */}
+    <button
+      onClick={descargarReporte}
+      className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+    >
+      <Download className="w-5 h-5" />
+      Descargar Reporte
+    </button>
+  </div>
+</div>
 
       {/* Selector de proyecto */}
       <div className="bg-white p-4 rounded-lg border border-gray-200 mb-6">

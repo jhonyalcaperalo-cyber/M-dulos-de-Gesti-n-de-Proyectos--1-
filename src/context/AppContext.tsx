@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState } from 'react';
 import type { Proyecto, Aporte, Hito, Persona } from '../types';
 import { mockProyectos, mockAportes, mockHitos, mockPersonas } from '../data/mockData';
+import type { Proyecto, Aporte, Hito, Persona, EstadoProyecto } from '../types';
 
 type AppContextType = {
   proyectos: Proyecto[];
@@ -8,6 +9,7 @@ type AppContextType = {
   aportes: Aporte[];
   hitos: Hito[];
 
+  cambiarEstadoProyecto: (proyectoId: string, estado: EstadoProyecto) => void;
   agregarProyecto: (p: Proyecto) => void;
   agregarAporte: (a: Aporte) => void;
   agregarHito: (h: Hito) => void;
@@ -21,7 +23,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [aportes, setAportes] = useState<Aporte[]>(mockAportes);
   const [hitos, setHitos] = useState<Hito[]>(mockHitos);
   const [personas] = useState<Persona[]>(mockPersonas);
-
+  const cambiarEstadoProyecto = (proyectoId: string, estado: EstadoProyecto) => {
+  setProyectos(prev =>
+    prev.map(p => (p.id === proyectoId ? { ...p, estado } : p))
+  );
+  };
   const agregarProyecto = (p: Proyecto) => {
     setProyectos(prev => [...prev, p]);
   };
@@ -51,10 +57,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const value = useMemo(
-    () => ({ proyectos, personas, aportes, hitos, agregarProyecto, agregarAporte, agregarHito, toggleHito }),
-    [proyectos, personas, aportes, hitos]
-  );
+ const value = useMemo(() => ({
+  proyectos,
+  aportes,
+  hitos,
+  personas,
+  agregarProyecto,
+  agregarAporte,
+  agregarHito,
+  toggleHito,
+  cambiarEstadoProyecto, // ✅
+}), [proyectos, aportes, hitos, personas]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
