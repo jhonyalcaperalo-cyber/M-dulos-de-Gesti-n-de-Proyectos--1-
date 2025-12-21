@@ -1,38 +1,50 @@
-import { useState } from 'react';
-import { mockProyectos, mockHitos, mockAportes } from '../data/mockData';
-import { Proyecto, Hito } from '../types';
+import { useEffect, useState } from 'react';
+import { useApp } from '../context/AppContext';
+import { Hito } from '../types';
 import { Plus, Download, Upload, CheckCircle, Circle, FileText, Calendar } from 'lucide-react';
 import { FormularioHito } from './FormularioHito';
 
 export function ModuloGestion() {
-  const [proyectoSeleccionado, setProyectoSeleccionado] = useState<string>(mockProyectos[0].id);
-  const [hitos, setHitos] = useState<Hito[]>(mockHitos);
+  const { proyectos, hitos, aportes, agregarHito, toggleHito } = useApp();
+
+  const [proyectoSeleccionado, setProyectoSeleccionado] = useState<string>(
+    proyectos[0]?.id ?? ''
+  );
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
-  const proyecto = mockProyectos.find(p => p.id === proyectoSeleccionado);
+  useEffect(() => {
+    if (!proyectoSeleccionado && proyectos.length > 0) {
+      setProyectoSeleccionado(proyectos[0].id);
+    }
+  }, [proyectos, proyectoSeleccionado]);
+
+  const proyecto = proyectos.find(p => p.id === proyectoSeleccionado);
   const hitosProyecto = hitos.filter(h => h.proyectoId === proyectoSeleccionado);
-  const aportesProyecto = mockAportes.filter(a => a.proyectoId === proyectoSeleccionado);
+  const aportesProyecto = aportes.filter(a => a.proyectoId === proyectoSeleccionado);
 
   const hitosCompletados = hitosProyecto.filter(h => h.completado).length;
   const progresoHitos = hitosProyecto.length > 0 ? (hitosCompletados / hitosProyecto.length) * 100 : 0;
 
   const handleGuardarHito = (hito: Hito) => {
-    setHitos([...hitos, hito]);
+    agregarHito(hito);
     setMostrarFormulario(false);
   };
 
   const toggleHitoCompletado = (hitoId: string) => {
-    setHitos(hitos.map(h => 
-      h.id === hitoId ? { ...h, completado: !h.completado } : h
-    ));
+    toggleHito(hitoId);
   };
 
   const descargarReporte = () => {
-    // Simulación de descarga de reporte
     alert('Generando reporte PDF... (funcionalidad en desarrollo)');
   };
 
-  if (!proyecto) return null;
+  if (!proyecto) {
+    return (
+      <div className="text-gray-600">
+        No hay proyecto seleccionado o no hay proyectos disponibles.
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -59,7 +71,7 @@ export function ModuloGestion() {
           onChange={(e) => setProyectoSeleccionado(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
-          {mockProyectos.map(p => (
+          {proyectos.map(p => (
             <option key={p.id} value={p.id}>
               {p.nombre} - {p.municipio}, {p.departamento}
             </option>
@@ -95,7 +107,7 @@ export function ModuloGestion() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Línea de tiempo - 2 columnas */}
+        {/* Línea de tiempo */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
@@ -109,7 +121,6 @@ export function ModuloGestion() {
               </button>
             </div>
 
-            {/* Formulario de nuevo hito */}
             {mostrarFormulario && (
               <div className="mb-6 pb-6 border-b">
                 <FormularioHito
@@ -120,7 +131,6 @@ export function ModuloGestion() {
               </div>
             )}
 
-            {/* Lista de hitos */}
             <div className="space-y-4">
               {hitosProyecto.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
@@ -129,13 +139,11 @@ export function ModuloGestion() {
               ) : (
                 hitosProyecto.map((hito, index) => (
                   <div key={hito.id} className="relative">
-                    {/* Línea conectora */}
                     {index < hitosProyecto.length - 1 && (
                       <div className="absolute left-5 top-12 bottom-0 w-0.5 bg-gray-200" />
                     )}
 
                     <div className="flex gap-4">
-                      {/* Icono de estado */}
                       <button
                         onClick={() => toggleHitoCompletado(hito.id)}
                         className="flex-shrink-0 relative z-10"
@@ -147,7 +155,6 @@ export function ModuloGestion() {
                         )}
                       </button>
 
-                      {/* Contenido del hito */}
                       <div className={`flex-1 p-4 rounded-lg border ${
                         hito.completado ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
                       }`}>
@@ -160,12 +167,11 @@ export function ModuloGestion() {
                             <span>{new Date(hito.fecha).toLocaleDateString()}</span>
                           </div>
                         </div>
-                        
+
                         <p className={`mb-3 ${hito.completado ? 'text-green-700' : 'text-gray-600'}`}>
                           {hito.descripcion}
                         </p>
 
-                        {/* Documentos */}
                         {hito.documentos.length > 0 && (
                           <div className="space-y-2">
                             <div className="text-gray-700">Documentos adjuntos:</div>
@@ -191,61 +197,44 @@ export function ModuloGestion() {
                 ))
               )}
             </div>
+
           </div>
         </div>
 
-        {/* Panel lateral - 1 columna */}
+        {/* Panel lateral */}
         <div className="space-y-6">
-          {/* Progreso general */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-gray-900 mb-4">Progreso General</h3>
-            
+
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-600">Avance de hitos</span>
                 <span className="text-gray-900">{progresoHitos.toFixed(0)}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="bg-purple-600 h-3 rounded-full transition-all"
-                  style={{ width: `${progresoHitos}%` }}
-                />
+                <div className="bg-purple-600 h-3 rounded-full" style={{ width: `${progresoHitos}%` }} />
               </div>
             </div>
 
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-600">Financiamiento</span>
-                <span className="text-gray-900">{((proyecto.montoRecaudado / proyecto.montoRequerido) * 100).toFixed(0)}%</span>
+                <span className="text-gray-900">
+                  {((proyecto.montoRecaudado / proyecto.montoRequerido) * 100).toFixed(0)}%
+                </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div
-                  className="bg-green-600 h-3 rounded-full transition-all"
+                  className="bg-green-600 h-3 rounded-full"
                   style={{ width: `${(proyecto.montoRecaudado / proyecto.montoRequerido) * 100}%` }}
                 />
               </div>
             </div>
-
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Hitos totales</span>
-                <span className="text-gray-900">{hitosProyecto.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Hitos completados</span>
-                <span className="text-green-600">{hitosCompletados}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Hitos pendientes</span>
-                <span className="text-yellow-600">{hitosProyecto.length - hitosCompletados}</span>
-              </div>
-            </div>
           </div>
 
-          {/* Aportes recibidos */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-gray-900 mb-4">Aportes Recibidos</h3>
-            
+
             {aportesProyecto.length === 0 ? (
               <p className="text-gray-500">No hay aportes registrados</p>
             ) : (
@@ -271,6 +260,7 @@ export function ModuloGestion() {
               </div>
             )}
           </div>
+
         </div>
       </div>
     </div>

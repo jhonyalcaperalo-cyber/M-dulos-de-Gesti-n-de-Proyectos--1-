@@ -28,7 +28,17 @@ export function Sidebar({ moduloActivo, setModuloActivo }: SidebarProps) {
       description: 'Trazabilidad'
     }
   ];
+return (
+  <aside className="w-72 shrink-0 bg-[#003366] text-white flex flex-col shadow-xl h-screen sticky top-0">
+    {/* ... */}
 
+    <nav className="flex-1 px-3 py-6 overflow-y-auto">
+      {/* ... */}
+    </nav>
+
+    {/* ... */}
+  </aside>
+);
   return (
     <aside className="w-72 bg-[#003366] text-white flex flex-col shadow-xl">
       {/* Logo / Brand */}
@@ -85,4 +95,5 @@ export function Sidebar({ moduloActivo, setModuloActivo }: SidebarProps) {
       </div>
     </aside>
   );
+
 }

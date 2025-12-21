@@ -1,22 +1,22 @@
 import { useState } from 'react';
-import { Plus, Filter, Eye, Edit } from 'lucide-react';
-import { mockProyectos, mockPersonas as Personas } from '../data/mockData';
+import { Plus, Filter, Eye } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 import { FormularioProyecto } from './FormularioProyecto';
 import { DetalleProyecto } from './DetalleProyecto';
 import { Proyecto, EstadoProyecto } from '../types';
 
 export function ModuloCaracterizacion() {
+  const { proyectos, personas, agregarProyecto } = useApp();
+
   const [vistaActiva, setVistaActiva] = useState<'lista' | 'nuevo' | 'detalle'>('lista');
-  const [proyectos, setProyectos] = useState<Proyecto[]>(mockProyectos);
   const [filtroEstado, setFiltroEstado] = useState<EstadoProyecto | 'todos'>('todos');
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<Proyecto | null>(null);
 
-  const proyectosFiltrados = filtroEstado === 'todos' 
-    ? proyectos 
-    : proyectos.filter(p => p.estado === filtroEstado);
+  const proyectosFiltrados =
+    filtroEstado === 'todos' ? proyectos : proyectos.filter(p => p.estado === filtroEstado);
 
   const handleNuevoProyecto = (proyecto: Proyecto) => {
-    setProyectos([...proyectos, proyecto]);
+    agregarProyecto(proyecto);
     setVistaActiva('lista');
   };
 
@@ -31,7 +31,7 @@ export function ModuloCaracterizacion() {
       validado: 'bg-blue-100 text-blue-800',
       en_espera: 'bg-yellow-100 text-yellow-800',
       activo: 'bg-green-100 text-green-800',
-      finalizado: 'bg-purple-100 text-purple-800'
+      finalizado: 'bg-purple-100 text-purple-800',
     };
     return colores[estado];
   };
@@ -42,7 +42,7 @@ export function ModuloCaracterizacion() {
       validado: 'Validado',
       en_espera: 'En Espera',
       activo: 'Activo',
-      finalizado: 'Finalizado'
+      finalizado: 'Finalizado',
     };
     return textos[estado];
   };
@@ -56,7 +56,7 @@ export function ModuloCaracterizacion() {
         >
           ← Volver a la lista
         </button>
-        <FormularioProyecto onGuardar={handleNuevoProyecto} personas={Personas} />
+        <FormularioProyecto onGuardar={handleNuevoProyecto} personas={personas} />
       </div>
     );
   }
@@ -110,7 +110,8 @@ export function ModuloCaracterizacion() {
             <option value="finalizado">Finalizado</option>
           </select>
           <span className="text-gray-600">
-            {proyectosFiltrados.length} proyecto{proyectosFiltrados.length !== 1 ? 's' : ''} encontrado{proyectosFiltrados.length !== 1 ? 's' : ''}
+            {proyectosFiltrados.length} proyecto{proyectosFiltrados.length !== 1 ? 's' : ''}{' '}
+            encontrado{proyectosFiltrados.length !== 1 ? 's' : ''}
           </span>
         </div>
       </div>

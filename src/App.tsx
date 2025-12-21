@@ -1,69 +1,65 @@
 import { useState } from 'react';
+import { Users, Handshake, ClipboardCheck } from 'lucide-react';
+
 import { ModuloCaracterizacion } from './components/ModuloCaracterizacion';
 import { ModuloApalancamiento } from './components/ModuloApalancamiento';
 import { ModuloGestion } from './components/ModuloGestion';
-import { Users, Handshake, ClipboardCheck } from 'lucide-react';
 
 type ModuloActivo = 'caracterizacion' | 'apalancamiento' | 'gestion';
 
 export default function App() {
   const [moduloActivo, setModuloActivo] = useState<ModuloActivo>('caracterizacion');
 
+  const tabs = [
+    { id: 'caracterizacion' as const, label: 'Caracterización y Oferta', icon: Users, active: 'border-green-600 text-green-700 bg-green-50' },
+    { id: 'apalancamiento' as const, label: 'Apalancamiento', icon: Handshake, active: 'border-blue-600 text-blue-700 bg-blue-50' },
+    { id: 'gestion' as const, label: 'Gestión y Trazabilidad', icon: ClipboardCheck, active: 'border-purple-600 text-purple-700 bg-purple-50' },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header superior (como tu imagen “correcta”) */}
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-gray-900">Plataforma de Inversión Social</h1>
-          <p className="text-gray-600">Sistema de gestión y apalancamiento de proyectos sociales</p>
+        <div className="max-w-7xl mx-auto px-8 py-6">
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Plataforma de Inversión Social
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Sistema de gestión y apalancamiento de proyectos sociales
+          </p>
+        </div>
+
+        {/* Tabs / Slide */}
+        <div className="border-t border-gray-100">
+          <div className="max-w-7xl mx-auto px-8">
+            <nav className="flex gap-6">
+              {tabs.map((t) => {
+                const Icon = t.icon;
+                const isActive = moduloActivo === t.id;
+
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setModuloActivo(t.id)}
+                    className={[
+                      'flex items-center gap-2 px-4 py-3 border-b-2 rounded-t-md transition-colors',
+                      isActive
+                        ? `${t.active}`
+                        : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50',
+                    ].join(' ')}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="text-sm font-medium">{t.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
         </div>
       </header>
 
-      {/* Navegación de módulos */}
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-1">
-            <button
-              onClick={() => setModuloActivo('caracterizacion')}
-              className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors ${
-                moduloActivo === 'caracterizacion'
-                  ? 'border-green-500 text-green-600 bg-green-50'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <Users className="w-5 h-5" />
-              Caracterización y Oferta
-            </button>
-            
-            <button
-              onClick={() => setModuloActivo('apalancamiento')}
-              className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors ${
-                moduloActivo === 'apalancamiento'
-                  ? 'border-blue-500 text-blue-600 bg-blue-50'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <Handshake className="w-5 h-5" />
-              Apalancamiento
-            </button>
-            
-            <button
-              onClick={() => setModuloActivo('gestion')}
-              className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors ${
-                moduloActivo === 'gestion'
-                  ? 'border-purple-500 text-purple-600 bg-purple-50'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <ClipboardCheck className="w-5 h-5" />
-              Gestión y Trazabilidad
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Contenido del módulo activo */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Contenido */}
+      <main className="max-w-7xl mx-auto px-8 py-8">
         {moduloActivo === 'caracterizacion' && <ModuloCaracterizacion />}
         {moduloActivo === 'apalancamiento' && <ModuloApalancamiento />}
         {moduloActivo === 'gestion' && <ModuloGestion />}
