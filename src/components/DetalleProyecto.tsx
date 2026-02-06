@@ -1,4 +1,4 @@
-import { Proyecto } from '../types';
+  import { Proyecto } from '../types';
 import { MapPin, User, DollarSign, Users, Briefcase, Calendar, AlertCircle } from 'lucide-react';
 
 interface DetalleProyectoProps {
