@@ -1,118 +1,165 @@
 import { useEffect, useState } from 'react';
-import { useApp } from '../context/AppContext';
-import { Hito } from '../types';
-import { Plus, Download, Upload, CheckCircle, Circle, FileText, Calendar } from 'lucide-react';
-import { FormularioHito } from './FormularioHito';
-import { Pencil } from 'lucide-react';
-import { EstadoProyecto } from '../types';
+import { useAppContext } from '../context/AppContext'; // <--- CORREGIDO: Usar useAppContext
+import { Hito, Proyecto, EstadoProyecto } from '../types'; // Asegúrate de importar Proyecto y EstadoProyecto
+import { Plus, Download, Upload, CheckCircle, Circle, FileText, Calendar, Pencil } from 'lucide-react';
+import { FormularioHito } from './FormularioHito'; // Asumo que este componente existe
+import { toast } from 'sonner'; // Importar toast para notificaciones
+import { supabase } from '../lib/supabase'; // Importar supabase
 
 export function ModuloGestion() {
- const { proyectos, hitos, aportes, agregarHito, toggleHito, cambiarEstadoProyecto } = useApp();
- const [mostrarCambioEstado, setMostrarCambioEstado] = useState(false);
-  const [proyectoSeleccionado, setProyectoSeleccionado] = useState<string>(
-    proyectos[0]?.id ?? ''
-  );
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  // <--- CORREGIDO: Solo desestructurar lo que el AppContext realmente provee
+  const { proyectos, loading } = useAppContext(); 
 
+  const [mostrarCambioEstado, setMostrarCambioEstado] = useState(false);
+  const [proyectoSeleccionadoId, setProyectoSeleccionadoId] = useState<string>(''); // Cambiado a Id
+  const [mostrarFormularioHito, setMostrarFormularioHito] = useState(false); // Renombrado para claridad
+
+  // useEffect para inicializar el proyectoSeleccionadoId
   useEffect(() => {
-    if (!proyectoSeleccionado && proyectos.length > 0) {
-      setProyectoSeleccionado(proyectos[0].id);
+    if (!loading && proyectos.length > 0 && !proyectoSeleccionadoId) {
+      setProyectoSeleccionadoId(proyectos[0].id);
     }
-  }, [proyectos, proyectoSeleccionado]);
+  }, [loading, proyectos, proyectoSeleccionadoId]); // Dependencias para re-evaluar
 
-  const proyecto = proyectos.find(p => p.id === proyectoSeleccionado);
-  const hitosProyecto = hitos.filter(h => h.proyectoId === proyectoSeleccionado);
-  const aportesProyecto = aportes.filter(a => a.proyectoId === proyectoSeleccionado);
+  // Obtener el proyecto completo basado en el ID seleccionado
+  const proyecto = proyectos.find(p => p.id === proyectoSeleccionadoId);
+
+  // Derivar hitos y aportes del proyecto seleccionado
+  // <--- CORREGIDO: hitos y aportes ahora vienen anidados dentro del objeto proyecto
+  const hitosProyecto = proyecto?.hitos || [];
+  const aportesProyecto = proyecto?.aportes || [];
 
   const hitosCompletados = hitosProyecto.filter(h => h.completado).length;
   const progresoHitos = hitosProyecto.length > 0 ? (hitosCompletados / hitosProyecto.length) * 100 : 0;
 
-  const handleGuardarHito = (hito: Hito) => {
-    agregarHito(hito);
-    setMostrarFormulario(false);
+  // <--- NUEVA IMPLEMENTACIÓN: Ahora FormularioHito debe insertar directamente a Supabase
+  const handleGuardarHitoSuccess = () => {
+    setMostrarFormularioHito(false);
+    toast.success('Hito guardado exitosamente.');
+    // El AppContext se refrescará automáticamente gracias al Realtime
   };
 
-  const toggleHitoCompletado = (hitoId: string) => {
-    toggleHito(hitoId);
+  // <--- NUEVA IMPLEMENTACIÓN: toggleHitoCompletado interactúa directamente con Supabase
+  const toggleHitoCompletado = async (hitoId: string, completadoActual: boolean) => {
+    const { error } = await supabase
+      .from('hitos')
+      .update({ completado: !completadoActual })
+      .eq('id', hitoId);
+
+    if (error) {
+      console.error('Error al cambiar estado del hito:', error);
+      toast.error('No se pudo actualizar el estado del hito.');
+    } else {
+      toast.success('Estado del hito actualizado.');
+      // El AppContext se refrescará automáticamente
+    }
   };
+
+  // <--- NUEVA IMPLEMENTACIÓN: cambiarEstadoProyecto interactúa directamente con Supabase
+  const cambiarEstadoProyecto = async (proyectoId: string, nuevoEstado: EstadoProyecto) => {
+    const { error } = await supabase
+      .from('proyectos')
+      .update({ estado: nuevoEstado })
+      .eq('id', proyectoId);
+
+    if (error) {
+      console.error('Error al cambiar estado del proyecto:', error);
+      toast.error('No se pudo actualizar el estado del proyecto.');
+    } else {
+      toast.success('Estado del proyecto actualizado.');
+      // El AppContext se refrescará automáticamente
+    }
+  };
+
 
   const descargarReporte = () => {
     alert('Generando reporte PDF... (funcionalidad en desarrollo)');
+    // Aquí iría la lógica para generar el PDF.
+    // Esto implicaría una función que consulte los datos de Supabase,
+    // los formatee y genere un PDF (ej. con jsPDF o similar, o una función de Supabase Edge Function)
   };
 
-  if (!proyecto) {
+  if (loading) {
     return (
-      <div className="text-gray-600">
-        No hay proyecto seleccionado o no hay proyectos disponibles.
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!proyecto) { // Ahora verificamos después de cargar
+    return (
+      <div className="text-gray-600 p-8">
+        No hay proyectos disponibles o seleccionado.
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="p-8"> {/* Añadido padding para que no esté pegado al borde */}
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-  <div>
-    <h2 className="text-gray-900">Gestión y Trazabilidad</h2>
-    <p className="text-gray-600">Seguimiento transparente de proyectos y uso de fondos</p>
-  </div>
+        <div>
+          <h2 className="text-gray-900">Gestión y Trazabilidad</h2>
+          <p className="text-gray-600">Seguimiento transparente de proyectos y uso de fondos</p>
+        </div>
 
-  <div className="flex items-center gap-3">
-    {/* Botón Cambiar Estado */}
-    <div className="relative">
-      <button
-        onClick={() => setMostrarCambioEstado(v => !v)}
-        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-      >
-        <Pencil className="w-4 h-4" />
-        Cambiar estado
-      </button>
+        <div className="flex items-center gap-3">
+          {/* Botón Cambiar Estado */}
+          <div className="relative">
+            <button
+              onClick={() => setMostrarCambioEstado(v => !v)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              <Pencil className="w-4 h-4" />
+              Cambiar estado
+            </button>
 
-      {mostrarCambioEstado && (
-        <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-20 w-56">
-          <label className="block text-xs text-gray-600 mb-2">Nuevo estado</label>
-          <select
-            value={proyecto.estado}
-            onChange={(e) => {
-              cambiarEstadoProyecto(proyecto.id, e.target.value as EstadoProyecto);
-              setMostrarCambioEstado(false);
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-          >
-            <option value="registrado">Registrado</option>
-            <option value="validado">Validado</option>
-            <option value="en_espera">En espera</option>
-            <option value="activo">Activo</option>
-            <option value="finalizado">Finalizado</option>
-          </select>
+            {mostrarCambioEstado && (
+              <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-20 w-56">
+                <label className="block text-xs text-gray-600 mb-2">Nuevo estado</label>
+                <select
+                  value={proyecto.estado}
+                  onChange={(e) => {
+                    cambiarEstadoProyecto(proyecto.id, e.target.value as EstadoProyecto);
+                    setMostrarCambioEstado(false);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="registrado">Registrado</option>
+                  <option value="validado">Validado</option>
+                  <option value="en_espera">En espera</option>
+                  <option value="activo">Activo</option>
+                  <option value="finalizado">Finalizado</option>
+                </select>
 
+                <button
+                  onClick={() => setMostrarCambioEstado(false)}
+                  className="mt-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Botón Descargar Reporte */}
           <button
-            onClick={() => setMostrarCambioEstado(false)}
-            className="mt-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+            onClick={descargarReporte}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
           >
-            Cancelar
+            <Download className="w-5 h-5" />
+            Descargar Reporte
           </button>
         </div>
-      )}
-    </div>
-
-    {/* Botón Descargar Reporte */}
-    <button
-      onClick={descargarReporte}
-      className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-    >
-      <Download className="w-5 h-5" />
-      Descargar Reporte
-    </button>
-  </div>
-</div>
+      </div>
 
       {/* Selector de proyecto */}
       <div className="bg-white p-4 rounded-lg border border-gray-200 mb-6">
         <label className="block text-gray-700 mb-2">Seleccionar Proyecto</label>
         <select
-          value={proyectoSeleccionado}
-          onChange={(e) => setProyectoSeleccionado(e.target.value)}
+          value={proyectoSeleccionadoId} // <--- CORREGIDO: Usar proyectoSeleccionadoId
+          onChange={(e) => setProyectoSeleccionadoId(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
           {proyectos.map(p => (
@@ -127,8 +174,8 @@ export function ModuloGestion() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <div className="text-gray-600 mb-1">Monto Aportado</div>
-          <div className="text-gray-900">${proyecto.montoRecaudado.toLocaleString()}</div>
-          <div className="text-gray-500">de ${proyecto.montoRequerido.toLocaleString()}</div>
+          <div className="text-gray-900">${(proyecto.montoRecaudado || 0).toLocaleString()}</div>
+          <div className="text-gray-500">de ${(proyecto.montoRequerido || 0).toLocaleString()}</div>
         </div>
 
         <div className="bg-white p-6 rounded-lg border border-gray-200">
@@ -157,7 +204,7 @@ export function ModuloGestion() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-gray-900">Línea de Tiempo de Hitos</h3>
               <button
-                onClick={() => setMostrarFormulario(!mostrarFormulario)}
+                onClick={() => setMostrarFormularioHito(!mostrarFormularioHito)} // <--- CORREGIDO
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
               >
                 <Plus className="w-4 h-4" />
@@ -165,12 +212,12 @@ export function ModuloGestion() {
               </button>
             </div>
 
-            {mostrarFormulario && (
+            {mostrarFormularioHito && ( // <--- CORREGIDO
               <div className="mb-6 pb-6 border-b">
                 <FormularioHito
-                  proyectoId={proyectoSeleccionado}
-                  onGuardar={handleGuardarHito}
-                  onCancelar={() => setMostrarFormulario(false)}
+                  proyectoId={proyecto.id} // <--- Pasar el ID del proyecto
+                  onGuardar={handleGuardarHitoSuccess} // <--- Pasar la función de éxito
+                  onCancelar={() => setMostrarFormularioHito(false)}
                 />
               </div>
             )}
@@ -189,7 +236,7 @@ export function ModuloGestion() {
 
                     <div className="flex gap-4">
                       <button
-                        onClick={() => toggleHitoCompletado(hito.id)}
+                        onClick={() => toggleHitoCompletado(hito.id, hito.completado)} // <--- CORREGIDO
                         className="flex-shrink-0 relative z-10"
                       >
                         {hito.completado ? (
@@ -208,6 +255,7 @@ export function ModuloGestion() {
                           </h4>
                           <div className="flex items-center gap-2 text-gray-500">
                             <Calendar className="w-4 h-4" />
+                            {/* <--- CORREGIDO: Manejar fecha como string o Date object */}
                             <span>{new Date(hito.fecha).toLocaleDateString()}</span>
                           </div>
                         </div>
@@ -216,7 +264,10 @@ export function ModuloGestion() {
                           {hito.descripcion}
                         </p>
 
-                        {hito.documentos.length > 0 && (
+                        {/* <--- VERIFICAR: hito.documentos no está en tu interfaz Hito de types/index.ts */}
+                        {/* Si Hito no tiene 'documentos', esto causará un error de TypeScript/runtime */}
+                        {/* Puedes agregarlo a la interfaz Hito o eliminar este bloque si no aplica */}
+                        {hito.documentos && hito.documentos.length > 0 && ( // <--- Agregado check si existe hito.documentos
                           <div className="space-y-2">
                             <div className="text-gray-700">Documentos adjuntos:</div>
                             {hito.documentos.map((doc) => (
@@ -264,13 +315,14 @@ export function ModuloGestion() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-600">Financiamiento</span>
                 <span className="text-gray-900">
-                  {((proyecto.montoRecaudado / proyecto.montoRequerido) * 100).toFixed(0)}%
+                  {/* <--- CORREGIDO: Asegurarse que montoRequerido no sea 0 para evitar division por cero */}
+                  {proyecto.montoRequerido > 0 ? ((proyecto.montoRecaudado / proyecto.montoRequerido) * 100).toFixed(0) : 0}%
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div
                   className="bg-green-600 h-3 rounded-full"
-                  style={{ width: `${(proyecto.montoRecaudado / proyecto.montoRequerido) * 100}%` }}
+                  style={{ width: `${proyecto.montoRequerido > 0 ? (proyecto.montoRecaudado / proyecto.montoRequerido) * 100 : 0}%` }}
                 />
               </div>
             </div>
@@ -304,7 +356,6 @@ export function ModuloGestion() {
               </div>
             )}
           </div>
-
         </div>
       </div>
     </div>

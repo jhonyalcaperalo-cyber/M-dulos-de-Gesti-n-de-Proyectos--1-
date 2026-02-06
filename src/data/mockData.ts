@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Proyecto } from '../types'
+// Dejo estos exports vacios para que no se rompan los imports viejos
+export const mockProyectos = [];
+export const mockAportes = [];
+export const mockHitos = [];
+export const mockPersonas = [];
 
 export function useProyectos() {
   const [proyectos, setProyectos] = useState<Proyecto[]>([])

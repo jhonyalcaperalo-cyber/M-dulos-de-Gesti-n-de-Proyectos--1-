@@ -1,11 +1,12 @@
-  import { Proyecto } from '../types';
-import { MapPin, User, DollarSign, Users, Briefcase, Calendar, AlertCircle } from 'lucide-react';
+import { Proyecto } from '../types';
+import { MapPin, User, DollarSign, Users, Briefcase, Calendar, AlertCircle, ArrowLeft } from 'lucide-react';
 
 interface DetalleProyectoProps {
   proyecto: Proyecto;
+  onVolver?: () => void;
 }
 
-export function DetalleProyecto({ proyecto }: DetalleProyectoProps) {
+export function DetalleProyecto({ proyecto, onVolver }: DetalleProyectoProps) {
   const porcentajeRecaudado = (proyecto.montoRecaudado / proyecto.montoRequerido) * 100;
 
   const getEstadoColor = (estado: string) => {
@@ -21,11 +22,23 @@ export function DetalleProyecto({ proyecto }: DetalleProyectoProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header con botón volver */}
+      <div className="flex items-center gap-4 mb-4">
+        {onVolver && (
+          <button
+            onClick={onVolver}
+            className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Volver
+          </button>
+        )}
+      </div>
+
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <h2 className="text-gray-900 mb-2">{proyecto.nombre}</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{proyecto.nombre}</h2>
             <p className="text-gray-600">{proyecto.descripcion}</p>
           </div>
           <span className={`px-4 py-2 rounded-full ${getEstadoColor(proyecto.estado)}`}>
@@ -69,7 +82,7 @@ export function DetalleProyecto({ proyecto }: DetalleProyectoProps) {
       {/* Beneficiario */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h3 className="text-gray-900 mb-4">Beneficiario Responsable</h3>
-        {proyecto.persona && (
+        {proyecto.persona ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center gap-3">
               <User className="w-5 h-5 text-gray-400" />
@@ -91,6 +104,8 @@ export function DetalleProyecto({ proyecto }: DetalleProyectoProps) {
               <div className="text-gray-900">{proyecto.persona.email}</div>
             </div>
           </div>
+        ) : (
+          <p className="text-gray-500">No hay beneficiario asignado</p>
         )}
       </div>
 
@@ -100,11 +115,11 @@ export function DetalleProyecto({ proyecto }: DetalleProyectoProps) {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-gray-600">Monto requerido</span>
-            <span className="text-gray-900">${proyecto.montoRequerido.toLocaleString()} COP</span>
+            <span className="text-gray-900">${(proyecto.montoRequerido || 0).toLocaleString()} COP</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-gray-600">Monto recaudado</span>
-            <span className="text-green-600">${proyecto.montoRecaudado.toLocaleString()} COP</span>
+            <span className="text-green-600">${(proyecto.montoRecaudado || 0).toLocaleString()} COP</span>
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -131,7 +146,7 @@ export function DetalleProyecto({ proyecto }: DetalleProyectoProps) {
             </div>
             <div>
               <div className="text-gray-600">Población beneficiada</div>
-              <div className="text-gray-900">{proyecto.poblacionBeneficiada} personas</div>
+              <div className="text-gray-900 text-xl font-semibold">{proyecto.poblacionBeneficiada || 0} personas</div>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -140,7 +155,7 @@ export function DetalleProyecto({ proyecto }: DetalleProyectoProps) {
             </div>
             <div>
               <div className="text-gray-600">Empleos a generar</div>
-              <div className="text-gray-900">{proyecto.empleosGenerados} empleos</div>
+              <div className="text-gray-900 text-xl font-semibold">{proyecto.empleosGenerados || 0} empleos</div>
             </div>
           </div>
         </div>
@@ -149,22 +164,26 @@ export function DetalleProyecto({ proyecto }: DetalleProyectoProps) {
       {/* Necesidades */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h3 className="text-gray-900 mb-4">Necesidades del Proyecto</h3>
-        <div className="space-y-3">
-          {proyecto.necesidades.map((necesidad) => (
-            <div key={necesidad.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="flex-1">
-                <div className="text-gray-900">{necesidad.descripcion}</div>
-                <div className="text-gray-600">{necesidad.categoria}</div>
+        {proyecto.necesidades && proyecto.necesidades.length > 0 ? (
+          <div className="space-y-3">
+            {proyecto.necesidades.map((necesidad) => (
+              <div key={necesidad.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <div className="text-gray-900">{necesidad.descripcion}</div>
+                  <div className="text-gray-600">{necesidad.categoria}</div>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-white ${
+                  necesidad.prioridad === 'alta' ? 'bg-red-500' :
+                  necesidad.prioridad === 'media' ? 'bg-yellow-500' : 'bg-blue-500'
+                }`}>
+                  Prioridad {necesidad.prioridad}
+                </span>
               </div>
-              <span className={`px-3 py-1 rounded-full text-white ${
-                necesidad.prioridad === 'alta' ? 'bg-red-500' :
-                necesidad.prioridad === 'media' ? 'bg-yellow-500' : 'bg-blue-500'
-              }`}>
-                Prioridad {necesidad.prioridad}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500">No hay necesidades registradas</p>
+        )}
       </div>
     </div>
   );

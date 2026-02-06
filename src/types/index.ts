@@ -9,6 +9,34 @@ export interface Persona {
   direccion: string;
   municipio: string;
   departamento: string;
+  created_at?: string;
+}
+
+export interface Documento {
+  id: string;
+  nombre: string;
+  url: string;
+  fechaSubida: string;
+}
+
+export interface Hito {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  fecha: string;
+  completado: boolean;
+  documentos?: Documento[];
+  proyectoId: string;
+}
+
+export interface Aporte {
+  id: string;
+  entidad: string;
+  donante: string;
+  monto: number;
+  fecha: string;
+  estado: 'aprobado' | 'pendiente' | 'rechazado';
+  proyectoId: string;
 }
 
 export interface Necesidad {
@@ -30,38 +58,25 @@ export interface Proyecto {
   montoRecaudado: number;
   estado: EstadoProyecto;
   fechaCreacion: string;
-  personaId: string;
+  personaId: string | null;
   persona?: Persona;
   necesidades: Necesidad[];
   poblacionBeneficiada: number;
   empleosGenerados: number;
+  // Campos para datos relacionados (vienen del JOIN en Supabase)
+  hitos?: Hito[];
+  aportes?: Aporte[];
 }
 
-export interface Aporte {
-  id: string;
-  proyectoId: string;
-  donante: string;
-  entidad: string;
-  monto: number;
-  fecha: string;
-  tipo: 'monetario' | 'especie' | 'servicio';
-  estado: 'pendiente' | 'aprobado' | 'rechazado';
-}
-
-export interface Hito {
-  id: string;
-  proyectoId: string;
-  titulo: string;
-  descripcion: string;
-  fecha: string;
-  completado: boolean;
-  documentos: Documento[];
-}
-
-export interface Documento {
-  id: string;
+export interface ProyectoFormData {
   nombre: string;
-  tipo: string;
-  url: string;
-  fechaSubida: string;
+  descripcion: string;
+  categoria: string;
+  region: string;
+  departamento: string;
+  municipio: string;
+  montoRequerido: number;
+  poblacionBeneficiada: number;
+  empleosGenerados: number;
+  personaId: string;
 }

@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { Proyecto, Aporte } from '../types';
 import { Filter, TrendingUp, Users, Briefcase, DollarSign, Handshake } from 'lucide-react';
 import { FormularioAporte } from './FormularioAporte';
-import { useApp } from '../context/AppContext';
+import { useAppContext } from '../context/AppContext';
 
 export function ModuloApalancamiento() {
   // Datos compartidos (los ve también Gestión)
-  const { proyectos, agregarAporte } = useApp();
+  const { proyectos, agregarAporte } = useAppContext();
 
   // UI local (solo para esta pantalla)
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
@@ -14,7 +14,7 @@ export function ModuloApalancamiento() {
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<Proyecto | null>(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
-  // Proyectos que se pueden apalancar (se recalcula cada render)
+  // Proyectos que se pueden apalancar (se recalcula cada render)f
   const proyectosDisponibles = proyectos.filter(
     p => p.estado === 'activo' || p.estado === 'validado'
   );
@@ -93,7 +93,7 @@ export function ModuloApalancamiento() {
             <div>
               <p className="text-gray-600">Población Total</p>
               <p className="text-gray-900">
-                {proyectosDisponibles.reduce((sum, p) => sum + p.poblacionBeneficiada, 0)}
+                {proyectosDisponibles.reduce((sum, p) => sum + (p.poblacionBeneficiada || 0), 0).toLocaleString()}
               </p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg">
@@ -107,7 +107,7 @@ export function ModuloApalancamiento() {
             <div>
               <p className="text-gray-600">Empleos Potenciales</p>
               <p className="text-gray-900">
-                {proyectosDisponibles.reduce((sum, p) => sum + p.empleosGenerados, 0)}
+                {proyectosDisponibles.reduce((sum, p) => sum + (p.empleosGenerados || 0), 0).toLocaleString()}
               </p>
             </div>
             <div className="p-3 bg-purple-100 rounded-lg">
@@ -124,7 +124,7 @@ export function ModuloApalancamiento() {
                 $
                 {(
                   proyectosDisponibles.reduce(
-                    (sum, p) => sum + (p.montoRequerido - p.montoRecaudado),
+                    (sum, p) => sum + ((p.montoRequerido || 0) - (p.montoRecaudado || 0)),
                     0
                   ) / 1000000
                 ).toFixed(1)}
