@@ -37,6 +37,9 @@ export interface Aporte {
   fecha: string;
   estado: 'aprobado' | 'pendiente' | 'rechazado';
   proyectoId: string;
+  tipo?: 'monetario' | 'especie' | 'servicio';
+  referenciaPago?: string;
+  transaccionesWompiId?: string;
 }
 
 export interface Necesidad {

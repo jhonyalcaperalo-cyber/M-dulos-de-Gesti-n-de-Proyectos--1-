@@ -18,8 +18,17 @@ export function FormularioHito({ proyectoId, onGuardar, onCancelar }: Formulario
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Generar UUID para el hito
+    const generateUUID = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+
     const nuevoHito: Hito = {
-      id: Date.now().toString(),
+      id: generateUUID(),
       proyectoId,
       titulo: formData.titulo,
       descripcion: formData.descripcion,

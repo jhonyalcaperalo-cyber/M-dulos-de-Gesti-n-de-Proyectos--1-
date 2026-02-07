@@ -1,12 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
-import type { Proyecto, Persona, Aporte } from '../types';
+import type { Proyecto, Persona, Aporte, Hito } from '../types';
 
 interface AppContextType {
   proyectos: Proyecto[];
   personas: Persona[];
   loading: boolean;
   agregarAporte: (aporte: Aporte) => Promise<void>;
+  agregarHito: (hito: Hito) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType>({} as AppContextType);
@@ -41,6 +42,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (updateError) {
       console.error('Error al actualizar monto del proyecto:', updateError);
       throw new Error('No se pudo actualizar el monto del proyecto');
+    }
+
+    // Recargar datos para reflejar los cambios
+    await cargarDatos();
+  };
+
+  const agregarHito = async (hito: Hito) => {
+    // Transformar a snake_case para Supabase
+    const hitoParaSupabase = {
+      id: hito.id,
+      titulo: hito.titulo,
+      descripcion: hito.descripcion,
+      fecha: hito.fecha,
+      completado: hito.completado,
+      proyectoid: hito.proyectoId
+    };
+
+    // Insertar el hito en Supabase
+    const { error: hitoError } = await supabase
+      .from('hitos')
+      .insert(hitoParaSupabase);
+
+    if (hitoError) {
+      console.error('Error al agregar hito:', hitoError);
+      throw new Error('No se pudo registrar el hito');
     }
 
     // Recargar datos para reflejar los cambios
@@ -133,7 +159,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ proyectos, personas, loading, agregarAporte }}>
+    <AppContext.Provider value={{ proyectos, personas, loading, agregarAporte, agregarHito }}>
       {children}
     </AppContext.Provider>
   );

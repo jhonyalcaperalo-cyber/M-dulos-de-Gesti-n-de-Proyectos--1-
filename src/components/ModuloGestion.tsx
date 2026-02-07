@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'; // Importar supabase
 
 export function ModuloGestion() {
   // <--- CORREGIDO: Solo desestructurar lo que el AppContext realmente provee
-  const { proyectos, loading } = useAppContext(); 
+  const { proyectos, loading, agregarHito } = useAppContext(); 
 
   const [mostrarCambioEstado, setMostrarCambioEstado] = useState(false);
   const [proyectoSeleccionadoId, setProyectoSeleccionadoId] = useState<string>(''); // Cambiado a Id
@@ -32,11 +32,15 @@ export function ModuloGestion() {
   const hitosCompletados = hitosProyecto.filter(h => h.completado).length;
   const progresoHitos = hitosProyecto.length > 0 ? (hitosCompletados / hitosProyecto.length) * 100 : 0;
 
-  // <--- NUEVA IMPLEMENTACIÓN: Ahora FormularioHito debe insertar directamente a Supabase
-  const handleGuardarHitoSuccess = () => {
-    setMostrarFormularioHito(false);
-    toast.success('Hito guardado exitosamente.');
-    // El AppContext se refrescará automáticamente gracias al Realtime
+  // <--- NUEVA IMPLEMENTACIÓN: handleGuardarHito ahora guarda en Supabase
+  const handleGuardarHito = async (hito: Hito) => {
+    try {
+      await agregarHito(hito);
+      setMostrarFormularioHito(false);
+      toast.success('Hito guardado exitosamente.');
+    } catch (error) {
+      toast.error('No se pudo guardar el hito.');
+    }
   };
 
   // <--- NUEVA IMPLEMENTACIÓN: toggleHitoCompletado interactúa directamente con Supabase
@@ -215,8 +219,8 @@ export function ModuloGestion() {
             {mostrarFormularioHito && ( // <--- CORREGIDO
               <div className="mb-6 pb-6 border-b">
                 <FormularioHito
-                  proyectoId={proyecto.id} // <--- Pasar el ID del proyecto
-                  onGuardar={handleGuardarHitoSuccess} // <--- Pasar la función de éxito
+                  proyectoId={proyecto.id}
+                  onGuardar={handleGuardarHito}
                   onCancelar={() => setMostrarFormularioHito(false)}
                 />
               </div>

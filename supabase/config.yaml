@@ -1,0 +1,18 @@
+# Supabase Configuration
+# https://supabase.com/docs/reference/cli/supabase-init
+
+project_id: "czohkologyslzjkvcqbd"
+
+# Edge Functions configurations
+[functions]
+# Add environment variables for Edge Functions here
+# These secrets should be set in your Supabase Dashboard under:
+# Project Settings > API > Environment variables
+
+# Wompi Private Key (from Wompi Dashboard > Development > API Keys)
+# Get it from: https://sandbox.wompi.co/dashboard/developers/api-keys
+WOMPI_PRIVATE_KEY=""
+
+# Wompi Events Secret (from Wompi Dashboard > Webhooks)
+# Used to verify webhook signatures
+WOMPI_EVENTS_SECRET=""

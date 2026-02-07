@@ -1,20 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Users, Handshake, ClipboardCheck } from 'lucide-react';
 
 import { ModuloCaracterizacion } from './components/ModuloCaracterizacion';
 import { ModuloApalancamiento } from './components/ModuloApalancamiento';
 import { ModuloGestion } from './components/ModuloGestion';
+import { PagoExitoso } from './pages/PagoExitoso';
 
-type ModuloActivo = 'caracterizacion' | 'apalancamiento' | 'gestion';
+type ModuloActivo = 'caracterizacion' | 'apalancamiento' | 'gestion' | 'pago-exitoso';
 
 export default function App() {
   const [moduloActivo, setModuloActivo] = useState<ModuloActivo>('caracterizacion');
+
+  // Detectar si estamos en la página de pago exitoso
+  useEffect(() => {
+    const currentPath = window.location.pathname;
+    
+    // Si la URL tiene /null, corregirla
+    if (currentPath === '/null') {
+      console.log('App.tsx - Invalid /null path detected, redirecting to root');
+      window.location.href = '/';
+      return;
+    }
+    
+    const params = new URLSearchParams(window.location.search);
+    const paymentSuccess = params.get('payment_success');
+    const reference = params.get('reference');
+    
+    console.log('App.tsx - Current URL:', { path: currentPath, search: window.location.search });
+    console.log('App.tsx - URL params:', { paymentSuccess, reference });
+    
+    if (paymentSuccess === 'true' || reference) {
+      console.log('Payment detected, setting modulo to pago-exitoso');
+      // Guardar referencia en sessionStorage
+      if (reference) {
+        sessionStorage.setItem('wompi_reference', reference);
+        console.log('Saved reference to sessionStorage:', reference);
+      }
+      setModuloActivo('pago-exitoso');
+    } else {
+      console.log('No payment detected in URL');
+    }
+  }, []);
 
   const tabs = [
     { id: 'caracterizacion' as const, label: 'Caracterización y Oferta', icon: Users, active: 'border-green-600 text-green-700 bg-green-50' },
     { id: 'apalancamiento' as const, label: 'Apalancamiento', icon: Handshake, active: 'border-blue-600 text-blue-700 bg-blue-50' },
     { id: 'gestion' as const, label: 'Gestión y Trazabilidad', icon: ClipboardCheck, active: 'border-purple-600 text-purple-700 bg-purple-50' },
   ];
+
+  if (moduloActivo === 'pago-exitoso') {
+    return <PagoExitoso />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

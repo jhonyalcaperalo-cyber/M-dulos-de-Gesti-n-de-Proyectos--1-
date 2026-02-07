@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { Proyecto, Aporte } from '../types';
-import { DollarSign, Building, User, Calendar } from 'lucide-react';
+import { DollarSign, Building, User, Calendar, CreditCard, Landmark, Smartphone, Shield } from 'lucide-react';
+import { createPaymentLink, formatAmount, generateReference, isValidEmail } from '../lib/wompi';
+import { toast } from 'sonner';
 
 interface FormularioAporteProps {
   proyecto: Proyecto;
   onGuardar: (aporte: Aporte) => void;
 }
+
+type PaymentMethod = 'PSE' | 'CARD' | 'NEQUI';
 
 export function FormularioAporte({ proyecto, onGuardar }: FormularioAporteProps) {
   const [formData, setFormData] = useState({
@@ -13,27 +17,129 @@ export function FormularioAporte({ proyecto, onGuardar }: FormularioAporteProps)
     entidad: '',
     monto: '',
     tipo: 'monetario' as 'monetario' | 'especie' | 'servicio',
-    observaciones: ''
+    observaciones: '',
+    email: '',
+    telefono: '',
+    documento: '',
   });
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('PSE');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Función para autocompletar datos de prueba
+  const fillTestData = () => {
+    setFormData({
+      donante: 'Juan Pérez',
+      entidad: '',
+      monto: '10000',
+      tipo: 'monetario',
+      observaciones: 'Test de integración Wompi',
+      email: 'juan@test.com',
+      telefono: '3111111111',
+      documento: '123456789',
+    });
+    setPaymentMethod('NEQUI');
+    console.log('FormularioAporte.tsx - Datos de prueba autocompletados');
+  };
 
   const montoFaltante = proyecto.montoRequerido - proyecto.montoRecaudado;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (formData.tipo !== 'monetario') {
+      // Para aportes no monetarios, guardar directamente
+      guardarAporteDirecto();
+      return;
+    }
+
+    // Para aportes monetarios, redirigir a Wompi
+    await procesarPagoWompi();
+  };
+
+  const guardarAporteDirecto = () => {
     const nuevoAporte: Aporte = {
-      id: Date.now().toString(),
+      id: generateReference('APORTE'),
       proyectoId: proyecto.id,
       donante: formData.donante,
       entidad: formData.entidad,
       monto: parseInt(formData.monto),
       fecha: new Date().toISOString().split('T')[0],
       tipo: formData.tipo,
-      estado: 'pendiente'
+      estado: 'pendiente',
     };
 
     onGuardar(nuevoAporte);
   };
+
+  const procesarPagoWompi = async () => {
+    const monto = parseInt(formData.monto);
+    
+    if (!isValidEmail(formData.email)) {
+      toast.error('Por favor ingresa un email válido');
+      return;
+    }
+
+    if (monto < 10000) {
+      toast.error('El monto mínimo es de $10.000 COP');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const response = await createPaymentLink({
+        reference: generateReference('WOMPI'),
+        amountInCents: monto * 100,
+        currency: 'COP',
+        customerEmail: formData.email,
+        customerName: formData.donante,
+        customerPhone: formData.telefono,
+        customerDocument: formData.documento,
+        customerDocumentType: 'CC',
+        projectId: proyecto.id,
+        projectName: proyecto.nombre,
+      });
+
+      console.log('FormularioAporte.tsx - Wompi response:', response);
+      console.log('FormularioAporte.tsx - id:', response.id);
+      
+      // Wompi sandbox no siempre devuelve redirect_url, lo construimos manualmente
+      const redirectUrl = response.redirect_url || `https://checkout.wompi.co/payment-links/${response.id}`;
+      const reference = response.reference || response.id;
+      
+      console.log('FormularioAporte.tsx - redirect_url:', redirectUrl);
+      console.log('FormularioAporte.tsx - reference:', reference);
+
+      // Mostrar info en pantalla antes de redirigir
+      alert(`Payment link creado!\nID: ${response.id}\nReference: ${reference}\nRedirect URL: ${redirectUrl}`);
+
+      // Guardar el aporte pendiente en Supabase
+      const nuevoAporte: Aporte = {
+        id: reference,
+        proyectoId: proyecto.id,
+        donante: formData.donante,
+        entidad: formData.entidad,
+        monto: monto,
+        fecha: new Date().toISOString().split('T')[0],
+        tipo: 'monetario',
+        estado: 'pendiente',
+      };
+
+      // Guardar referencia del pago para cuando regrese de Wompi
+      localStorage.setItem(`wompi_reference_${reference}`, JSON.stringify(nuevoAporte));
+
+      // Redirigir al checkout de Wompi
+      window.location.href = redirectUrl;
+
+    } catch (error) {
+      console.error('Error al procesar pago:', error);
+      toast.error('Error al iniciar el pago. Por favor intenta nuevamente.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const esPagoMonetario = formData.tipo === 'monetario';
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -73,9 +179,33 @@ export function FormularioAporte({ proyecto, onGuardar }: FormularioAporteProps)
 
       {/* Formulario de aporte */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-gray-900 mb-6">Registrar Aporte</h3>
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-gray-900">Registrar Aporte</h3>
+          <button
+            type="button"
+            onClick={fillTestData}
+            className="text-sm text-blue-600 hover:text-blue-800 underline"
+          >
+            Llenar datos de prueba (Wompi)
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Tipo de aporte */}
+          <div>
+            <label className="block text-gray-700 mb-2">Tipo de Aporte *</label>
+            <select
+              required
+              value={formData.tipo}
+              onChange={(e) => setFormData({ ...formData, tipo: e.target.value as 'monetario' | 'especie' | 'servicio' })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="monetario">Aporte Monetario (Pago en línea)</option>
+              <option value="especie">Aporte en Especie</option>
+              <option value="servicio">Aporte en Servicio</option>
+            </select>
+          </div>
+
           {/* Información del donante */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -109,39 +239,107 @@ export function FormularioAporte({ proyecto, onGuardar }: FormularioAporteProps)
             </div>
           </div>
 
-          {/* Tipo y monto */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-gray-700 mb-2">Tipo de Aporte *</label>
-              <select
-                required
-                value={formData.tipo}
-                onChange={(e) => setFormData({ ...formData, tipo: e.target.value as 'monetario' | 'especie' | 'servicio' })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="monetario">Aporte Monetario</option>
-                <option value="especie">Aporte en Especie</option>
-                <option value="servicio">Aporte en Servicio</option>
-              </select>
-            </div>
+          {/* Email y teléfono (requeridos para pagos online) */}
+          {esPagoMonetario && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="flex items-center gap-2 text-gray-700 mb-2">
+                  <User className="w-4 h-4" />
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  required={esPagoMonetario}
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ej: juan@email.com"
+                />
+              </div>
 
-            <div>
-              <label className="flex items-center gap-2 text-gray-700 mb-2">
-                <DollarSign className="w-4 h-4" />
-                Monto del Aporte (COP) *
-              </label>
-              <input
-                type="number"
-                required
-                min="1"
-                max={montoFaltante}
-                value={formData.monto}
-                onChange={(e) => setFormData({ ...formData, monto: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder={`Máximo: ${montoFaltante.toLocaleString()}`}
-              />
+              <div>
+                <label className="flex items-center gap-2 text-gray-700 mb-2">
+                  <Smartphone className="w-4 h-4" />
+                  Teléfono
+                </label>
+                <input
+                  type="tel"
+                  value={formData.telefono}
+                  onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ej: 3001234567"
+                />
+              </div>
             </div>
+          )}
+
+          {/* Monto */}
+          <div>
+            <label className="flex items-center gap-2 text-gray-700 mb-2">
+              <DollarSign className="w-4 h-4" />
+              {esPagoMonetario ? 'Monto del Aporte (COP) *' : 'Valor estimado (COP)'}
+            </label>
+            <input
+              type="number"
+              required
+              min={esPagoMonetario ? 10000 : 1}
+              max={montoFaltante}
+              value={formData.monto}
+              onChange={(e) => setFormData({ ...formData, monto: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder={`${esPagoMonetario ? 'Mínimo: $10.000' : 'Valor del aporte en especie'}`}
+            />
+            {esPagoMonetario && (
+              <p className="text-sm text-gray-500 mt-1">Monto mínimo: $10.000 COP</p>
+            )}
           </div>
+
+          {/* Métodos de pago (solo para pagos monetarios) */}
+          {esPagoMonetario && (
+            <div>
+              <label className="block text-gray-700 mb-2">Método de Pago *</label>
+              <div className="grid grid-cols-3 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('PSE')}
+                  className={`p-4 border rounded-lg flex flex-col items-center gap-2 transition-colors ${
+                    paymentMethod === 'PSE' 
+                      ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <Landmark className="w-8 h-8" />
+                  <span className="text-sm font-medium">PSE</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('CARD')}
+                  className={`p-4 border rounded-lg flex flex-col items-center gap-2 transition-colors ${
+                    paymentMethod === 'CARD' 
+                      ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <CreditCard className="w-8 h-8" />
+                  <span className="text-sm font-medium">Tarjeta</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('NEQUI')}
+                  className={`p-4 border rounded-lg flex flex-col items-center gap-2 transition-colors ${
+                    paymentMethod === 'NEQUI' 
+                      ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <Smartphone className="w-8 h-8" />
+                  <span className="text-sm font-medium">Nequi</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Observaciones */}
           <div>
@@ -175,22 +373,55 @@ export function FormularioAporte({ proyecto, onGuardar }: FormularioAporteProps)
                 <span className="text-gray-600">Tipo:</span>
                 <span className="text-gray-900">{formData.tipo}</span>
               </div>
-              <div className="flex justify-between border-t pt-2">
-                <span className="text-gray-900">Monto del aporte:</span>
-                <span className="text-blue-600">
-                  ${formData.monto ? parseInt(formData.monto).toLocaleString() : '0'} COP
-                </span>
-              </div>
+              {esPagoMonetario && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Método:</span>
+                    <span className="text-gray-900">{paymentMethod}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-gray-900 font-medium">Monto del aporte:</span>
+                    <span className="text-blue-600 font-bold text-lg">
+                      ${formData.monto ? parseInt(formData.monto).toLocaleString() : '0'} COP
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
+
+          {/* Información de seguridad */}
+          {esPagoMonetario && (
+            <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-5 h-5 text-green-600" />
+                <h4 className="text-green-900 font-medium">Pago Seguro</h4>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-green-800 text-sm">
+                <li>Pago procesado por Wompi (Bancolombia)</li>
+                <li>Cifrado SSL de 256 bits</li>
+                <li>Accepted: PSE, Tarjetas de crédito, Nequi</li>
+              </ul>
+            </div>
+          )}
 
           {/* Información adicional */}
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
             <h4 className="text-blue-900 mb-2">Información Importante</h4>
             <ul className="list-disc list-inside space-y-1 text-blue-800">
-              <li>El aporte quedará en estado "Pendiente" hasta su aprobación</li>
-              <li>Recibirás un comprobante digital una vez aprobado el aporte</li>
-              <li>Podrás hacer seguimiento al uso de fondos desde el módulo de Gestión</li>
+              {esPagoMonetario ? (
+                <>
+                  <li>Serás redirigido a Wompi para completar el pago de forma segura</li>
+                  <li>Recibirás un comprobante por email después del pago</li>
+                  <li>El aporte quedará confirmado una vez aprobado el pago</li>
+                </>
+              ) : (
+                <>
+                  <li>El aporte quedará en estado "Pendiente" hasta su aprobación</li>
+                  <li>Recibirás un comprobante digital una vez aprobado el aporte</li>
+                  <li>Podrás hacer seguimiento al uso de fondos desde el módulo de Gestión</li>
+                </>
+              )}
             </ul>
           </div>
 
@@ -198,9 +429,26 @@ export function FormularioAporte({ proyecto, onGuardar }: FormularioAporteProps)
           <div className="flex justify-end gap-4 pt-4 border-t">
             <button
               type="submit"
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              disabled={isProcessing}
+              className={`px-6 py-3 text-white rounded-lg transition-colors ${
+                isProcessing 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
             >
-              Confirmar Aporte
+              {isProcessing ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Procesando...
+                </span>
+              ) : esPagoMonetario ? (
+                `Pagar con ${paymentMethod === 'PSE' ? 'PSE' : paymentMethod === 'CARD' ? 'Tarjeta' : 'Nequi'}`
+              ) : (
+                'Confirmar Aporte'
+              )}
             </button>
           </div>
         </form>
