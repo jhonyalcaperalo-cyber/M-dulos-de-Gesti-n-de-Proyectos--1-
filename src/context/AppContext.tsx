@@ -8,6 +8,7 @@ interface AppContextType {
   loading: boolean;
   agregarAporte: (aporte: Aporte) => Promise<void>;
   agregarHito: (hito: Hito) => Promise<void>;
+  refrescarProyectos: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType>({} as AppContextType);
@@ -73,6 +74,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await cargarDatos();
   };
 
+  const refrescarProyectos = async () => {
+    await cargarDatos();
+  };
+
   async function cargarDatos() {
     setLoading(true);
 
@@ -82,7 +87,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .select(`
         *,
         persona:personas(id, nombre, documento, telefono, email, direccion, municipio, departamento, created_at),
-        hitos(id, titulo, descripcion, fecha, completado, proyectoid),
+        hitos(id, titulo, descripcion, fecha, completado, proyectoid, documentos(id, nombre, tipo, url, fechasubida, hitoid)),
         aportes(id, entidad, donante, monto, fecha, estado, proyectoid)
       `)
       .order('created_at', { ascending: false });
@@ -159,7 +164,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ proyectos, personas, loading, agregarAporte, agregarHito }}>
+    <AppContext.Provider value={{ proyectos, personas, loading, agregarAporte, agregarHito, refrescarProyectos }}>
       {children}
     </AppContext.Provider>
   );

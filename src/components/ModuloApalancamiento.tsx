@@ -6,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 
 export function ModuloApalancamiento() {
   // Datos compartidos (los ve también Gestión)
-  const { proyectos, agregarAporte } = useAppContext();
+  const { proyectos, agregarAporte, refrescarProyectos } = useAppContext();
 
   // UI local (solo para esta pantalla)
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
@@ -33,11 +33,11 @@ export function ModuloApalancamiento() {
     setMostrarFormulario(true);
   };
 
-  const handleGuardarAporte = (aporte: Aporte) => {
+  const handleGuardarAporte = async (aporte: Aporte) => {
     // Esto es lo que "une" con Gestión:
     // - guarda el aporte globalmente
     // - y actualiza montoRecaudado del proyecto (en el contexto)
-    agregarAporte(aporte);
+    await agregarAporte(aporte);
 
     setMostrarFormulario(false);
     setProyectoSeleccionado(null);

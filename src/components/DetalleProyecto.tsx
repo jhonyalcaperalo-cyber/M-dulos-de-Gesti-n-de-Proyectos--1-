@@ -1,13 +1,24 @@
+import { useAuth } from '../context/AuthContext';
 import { Proyecto } from '../types';
-import { MapPin, User, DollarSign, Users, Briefcase, Calendar, AlertCircle, ArrowLeft } from 'lucide-react';
+import { MapPin, User, DollarSign, Users, Briefcase, Calendar, AlertCircle, ArrowLeft, Crown, Pencil, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '../lib/supabase';
+import { logProjectAction } from '../lib/audit';
 
 interface DetalleProyectoProps {
   proyecto: Proyecto;
   onVolver?: () => void;
+  onEditar?: (proyecto: Proyecto) => void;
+  onEliminar?: (proyectoId: string) => void;
 }
 
-export function DetalleProyecto({ proyecto, onVolver }: DetalleProyectoProps) {
+export function DetalleProyecto({ proyecto, onVolver, onEditar, onEliminar }: DetalleProyectoProps) {
+  const { user } = useAuth();
   const porcentajeRecaudado = (proyecto.montoRecaudado / proyecto.montoRequerido) * 100;
+  
+  // Verificar si el usuario actual es el creador del proyecto
+  const esCreador = user?.id === proyecto.user_id;
+  const isAdmin = user?.role === 'admin';
 
   const getEstadoColor = (estado: string) => {
     const colores = {
@@ -20,18 +31,80 @@ export function DetalleProyecto({ proyecto, onVolver }: DetalleProyectoProps) {
     return colores[estado as keyof typeof colores];
   };
 
+  const handleEliminar = async () => {
+    if (confirm('¿Estás seguro de eliminar este proyecto? Esta acción no se puede deshacer.')) {
+      // Log de auditoría antes de eliminar
+      if (user) {
+        await logProjectAction(
+          user,
+          'delete',
+          proyecto.id,
+          proyecto.nombre,
+          { estado: proyecto.estado, monto: proyecto.montoRequerido }
+        );
+      }
+      
+      if (onEliminar) {
+        onEliminar(proyecto.id);
+      } else {
+        // Eliminar directamente si no hay callback
+        const { error } = await supabase.from('proyectos').delete().eq('id', proyecto.id);
+        if (error) {
+          toast.error('No se pudo eliminar el proyecto');
+        } else {
+          toast.success('Proyecto eliminado');
+          onVolver?.();
+        }
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header con botón volver */}
-      <div className="flex items-center gap-4 mb-4">
-        {onVolver && (
-          <button
-            onClick={onVolver}
-            className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Volver
-          </button>
+      {/* Header con botón volver y controles */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          {onVolver && (
+            <button
+              onClick={onVolver}
+              className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Volver
+            </button>
+          )}
+        </div>
+        
+        {/* Botones de acción para el creador/admin */}
+        {(esCreador || isAdmin) && (
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1 text-sm text-gray-500">
+              {isAdmin && !esCreador && <Crown className="w-4 h-4 text-yellow-500" />}
+              {(esCreador || isAdmin) && (
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
+                  {esCreador ? 'Tu proyecto' : 'Admin'}
+                </span>
+              )}
+            </span>
+            {onEditar && (
+              <button
+                onClick={() => onEditar(proyecto)}
+                className="flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                Editar
+              </button>
+            )}
+            {(isAdmin || esCreador) && (
+              <button
+                onClick={handleEliminar}
+                className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Eliminar
+              </button>
+            )}
+          </div>
         )}
       </div>
 

@@ -16,3 +16,8 @@ WOMPI_PRIVATE_KEY=""
 # Wompi Events Secret (from Wompi Dashboard > Webhooks)
 # Used to verify webhook signatures
 WOMPI_EVENTS_SECRET=""
+
+# Frontend URL for redirects after payment
+# For local development: http://localhost:5173
+# For production: your-production-url.com
+FRONTEND_URL=""

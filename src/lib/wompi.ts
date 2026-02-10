@@ -1,10 +1,18 @@
 // Servicio de integración con Wompi
-import type { WompiPaymentRequest, WompiTransaction, WompiCheckoutResponse } from '../types/wompi';
+// Documentación: https://docs.wompi.co/docs/enlaces-de-pago
+import { supabase } from './supabase';
+import type {
+  WompiPaymentRequest,
+  WompiTransaction,
+  WompiCheckoutResponse,
+  CustomerReference,
+  TaxInfo,
+} from '../types/wompi';
 
 const WOMPI_API_URL = 'https://sandbox.wompi.co/v1';
 const PUBLIC_KEY = import.meta.env.VITE_WOMPI_PUBLIC_KEY;
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
 // URL de la Edge Function para crear payment links
 const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1`;
@@ -22,24 +30,31 @@ export function isSandbox(): boolean {
 }
 
 /**
+ * Obtener URL del checkout de Wompi
+ */
+export function getPaymentLinkUrl(paymentLinkId: string): string {
+  return `https://checkout.wompi.co/l/${paymentLinkId}`;
+}
+
+/**
  * Crear un enlace de pago usando la Edge Function
  */
 export async function createPaymentLink(request: WompiPaymentRequest): Promise<WompiCheckoutResponse> {
   console.log('Creating payment link with request:', request);
   
-  // Usar fetch directo con service role key
+  // Usar service role key para la Edge Function
+  const authToken = SUPABASE_SERVICE_KEY;
+  
   const response = await fetch(`${EDGE_FUNCTION_URL}/wompi-create-payment`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-      'apikey': SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${authToken}`,
+      'apikey': authToken,
     },
     body: JSON.stringify(request),
   });
 
-  console.log('Response status:', response.status);
-  
   if (!response.ok) {
     const error = await response.text();
     console.error('Error invoking Edge Function:', error);
@@ -49,6 +64,79 @@ export async function createPaymentLink(request: WompiPaymentRequest): Promise<W
   const data = await response.json();
   console.log('Payment link created:', data);
   return data;
+}
+
+/**
+ * Crear link de pago con monto fijo
+ */
+export async function createFixedAmountPaymentLink(
+  reference: string,
+  amountInCents: number,
+  projectName: string,
+  options?: {
+    customerEmail?: string;
+    customerName?: string;
+    expiresAt?: string;
+    customerReferences?: CustomerReference[];
+    taxes?: TaxInfo[];
+  }
+): Promise<WompiCheckoutResponse> {
+  return createPaymentLink({
+    reference,
+    amountInCents,
+    currency: 'COP',
+    projectName,
+    singleUse: true,
+    ...options,
+  });
+}
+
+/**
+ * Crear link de pago con monto abierto (cliente elige el monto)
+ */
+export async function createOpenAmountPaymentLink(
+  reference: string,
+  projectName: string,
+  options?: {
+    customerEmail?: string;
+    customerName?: string;
+    expiresAt?: string;
+    customerReferences?: CustomerReference[];
+    taxes?: TaxInfo[];
+  }
+): Promise<WompiCheckoutResponse> {
+  return createPaymentLink({
+    reference,
+    projectName,
+    singleUse: false,
+    ...options,
+  });
+}
+
+/**
+ * Crear link de pago con campos personalizados
+ */
+export async function createPaymentLinkWithCustomFields(
+  reference: string,
+  amountInCents: number | undefined,
+  projectName: string,
+  customFields: CustomerReference[],
+  options?: {
+    customerEmail?: string;
+    customerName?: string;
+    expiresAt?: string;
+    taxes?: TaxInfo[];
+  }
+): Promise<WompiCheckoutResponse> {
+  return createPaymentLink({
+    reference,
+    amountInCents,
+    currency: 'COP',
+    projectName,
+    singleUse: true,
+    customerReferences: customFields,
+    ...options,
+  });
 }
 
 /**
@@ -117,5 +205,42 @@ export function estimateFees(amountInCents: number, method: 'PSE' | 'CARD' | 'NE
   return {
     fee,
     netAmount,
+  };
+}
+
+/**
+ * Calcular IVA (VAT) - Colombia 19%
+ */
+export function calculateVAT(amountInCents: number, rate: number = 0.19): number {
+  return Math.round(amountInCents * rate);
+}
+
+/**
+ * Crear configuración de impuestos para monto fijo
+ */
+export function createFixedTax(taxType: 'VAT' | 'CONSUMPTION', amountInCents: number): TaxInfo {
+  return {
+    type: taxType,
+    amount_in_cents: amountInCents,
+  };
+}
+
+/**
+ * Crear configuración de impuestos para monto abierto (porcentage)
+ */
+export function createPercentageTax(taxType: 'VAT' | 'CONSUMPTION', percentage: number): TaxInfo {
+  return {
+    type: taxType,
+    percentage: percentage,
+  };
+}
+
+/**
+ * Crear campo personalizado para el formulario de pago
+ */
+export function createCustomerReference(label: string, isRequired: boolean = true): CustomerReference {
+  return {
+    label: label.substring(0, 24), // Máximo 24 caracteres
+    is_required: isRequired,
   };
 }

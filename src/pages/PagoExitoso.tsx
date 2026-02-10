@@ -128,7 +128,7 @@ export function PagoExitoso() {
                 <div>
                   <p className="text-gray-600 text-sm">Monto</p>
                   <p className="text-green-600 font-bold text-xl">
-                    {aporte?.monto ? formatAmount(aporte.monto * 100) : '$0'}
+                    {aporte?.monto ? formatAmount(aporte.monto) : '$0'}
                   </p>
                 </div>
               </div>

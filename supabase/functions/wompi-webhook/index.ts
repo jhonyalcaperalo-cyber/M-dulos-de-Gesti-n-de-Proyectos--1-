@@ -48,14 +48,43 @@ serve(async (req: Request) => {
 
   const body = await req.text();
   
-  // Verificar firma (simplificado - en producción usar crypto)
-  const expectedSignature = eventsSecret;
-  if (signature !== expectedSignature) {
-    console.error('Invalid signature');
-    return new Response('Invalid signature', { status: 401, headers: corsHeaders });
-  }
-
   try {
+    // Verificar firma HMAC-SHA256
+    if (eventsSecret) {
+      // Extraer timestamp y firma del header
+      const [timestampPart, receivedSignaturePart] = signature.split(',');
+      const timestampValue = timestampPart?.split('=')[1];
+      const receivedSignature = receivedSignaturePart?.split('=')[1];
+
+      if (timestampValue && receivedSignature) {
+        // Crear payload para verificar: timestamp + body
+        const payload = timestampValue + body;
+        
+        // Calcular firma esperada usando HMAC-SHA256
+        const encoder = new TextEncoder();
+        const key = await crypto.subtle.importKey(
+          'raw',
+          encoder.encode(eventsSecret),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        const signatureBuffer = await crypto.subtle.sign(
+          'HMAC',
+          key,
+          encoder.encode(payload)
+        );
+        const calculatedSignature = Array.from(new Uint8Array(signatureBuffer))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+
+        if (calculatedSignature !== receivedSignature) {
+          console.error('Invalid signature');
+          return new Response('Invalid signature', { status: 401, headers: corsHeaders });
+        }
+      }
+    }
+
     const event: WompiEvent = JSON.parse(body);
     console.log('Received Wompi event:', event.name);
 

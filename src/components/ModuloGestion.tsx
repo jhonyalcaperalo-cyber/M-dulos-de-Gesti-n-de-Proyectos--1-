@@ -1,50 +1,188 @@
-import { useEffect, useState } from 'react';
-import { useAppContext } from '../context/AppContext'; // <--- CORREGIDO: Usar useAppContext
-import { Hito, Proyecto, EstadoProyecto } from '../types'; // Asegúrate de importar Proyecto y EstadoProyecto
-import { Plus, Download, Upload, CheckCircle, Circle, FileText, Calendar, Pencil } from 'lucide-react';
-import { FormularioHito } from './FormularioHito'; // Asumo que este componente existe
-import { toast } from 'sonner'; // Importar toast para notificaciones
-import { supabase } from '../lib/supabase'; // Importar supabase
+import { useEffect, useState, useRef } from 'react';
+import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
+import { Hito, Proyecto, EstadoProyecto, Documento } from '../types';
+import { Plus, Download, Upload, CheckCircle, Circle, FileText, Calendar, Pencil, X, Loader2, Lock, Crown } from 'lucide-react';
+import { FormularioHito } from './FormularioHito';
+import { toast } from 'sonner';
+import { supabase } from '../lib/supabase';
+import { logAudit, logMilestoneAction, logDocumentAction } from '../lib/audit';
 
 export function ModuloGestion() {
-  // <--- CORREGIDO: Solo desestructurar lo que el AppContext realmente provee
-  const { proyectos, loading, agregarHito } = useAppContext(); 
+  const { proyectos, loading, agregarHito, refrescarProyectos } = useAppContext();
+  const { user, session } = useAuth();
 
   const [mostrarCambioEstado, setMostrarCambioEstado] = useState(false);
-  const [proyectoSeleccionadoId, setProyectoSeleccionadoId] = useState<string>(''); // Cambiado a Id
-  const [mostrarFormularioHito, setMostrarFormularioHito] = useState(false); // Renombrado para claridad
+  const [proyectoSeleccionadoId, setProyectoSeleccionadoId] = useState<string>('');
+  const [mostrarFormularioHito, setMostrarFormularioHito] = useState(false);
+  const [hitoEditandoId, setHitoEditandoId] = useState<string | null>(null);
+  const [subiendoDocumento, setSubiendoDocumento] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [hitoParaSubirDocumento, setHitoParaSubirDocumento] = useState<string | null>(null);
 
-  // useEffect para inicializar el proyectoSeleccionadoId
+  const isAdmin = user?.role === 'admin';
+  const proyecto = proyectos.find(p => p.id === proyectoSeleccionadoId);
+  const esCreador = user?.id === proyecto?.user_id;
+  const puedeEditar = isAdmin || esCreador || session;
+
   useEffect(() => {
     if (!loading && proyectos.length > 0 && !proyectoSeleccionadoId) {
       setProyectoSeleccionadoId(proyectos[0].id);
     }
-  }, [loading, proyectos, proyectoSeleccionadoId]); // Dependencias para re-evaluar
+  }, [loading, proyectos, proyectoSeleccionadoId]);
 
-  // Obtener el proyecto completo basado en el ID seleccionado
-  const proyecto = proyectos.find(p => p.id === proyectoSeleccionadoId);
-
-  // Derivar hitos y aportes del proyecto seleccionado
-  // <--- CORREGIDO: hitos y aportes ahora vienen anidados dentro del objeto proyecto
   const hitosProyecto = proyecto?.hitos || [];
   const aportesProyecto = proyecto?.aportes || [];
 
   const hitosCompletados = hitosProyecto.filter(h => h.completado).length;
   const progresoHitos = hitosProyecto.length > 0 ? (hitosCompletados / hitosProyecto.length) * 100 : 0;
 
-  // <--- NUEVA IMPLEMENTACIÓN: handleGuardarHito ahora guarda en Supabase
   const handleGuardarHito = async (hito: Hito) => {
     try {
       await agregarHito(hito);
       setMostrarFormularioHito(false);
       toast.success('Hito guardado exitosamente.');
+      
+      // Log de auditoría
+      if (user) {
+        await logMilestoneAction(
+          user,
+          'create',
+          hito.proyectoId,
+          hito.titulo,
+          hito.proyectoId,
+          { fecha: hito.fecha }
+        );
+      }
     } catch (error) {
       toast.error('No se pudo guardar el hito.');
     }
   };
 
-  // <--- NUEVA IMPLEMENTACIÓN: toggleHitoCompletado interactúa directamente con Supabase
+  const handleSubirDocumento = async (hitoId: string, file: File) => {
+    try {
+      setSubiendoDocumento(true);
+      
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `${hitoId}/${Date.now()}.${fileExtension}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('Documentos')
+        .upload(`hitos/${fileName}`, file);
+        
+      if (uploadError) {
+        throw uploadError;
+      }
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('Documentos')
+        .getPublicUrl(`hitos/${fileName}`);
+    
+      const { error: dbError } = await supabase
+        .from('documentos')
+        .insert({
+          nombre: file.name,
+          tipo: file.type,
+          url: publicUrl,
+          proyectoid: proyectoSeleccionadoId,
+          hitoid: hitoId,
+          fechasubida: new Date().toLocaleDateString('es-CO'),
+          storage_path: `hitos/${fileName}`
+        });
+        
+      if (dbError) {
+        console.error('Error DB:', dbError);
+        throw dbError;
+      }
+      
+      // Marcar el hito como completado
+      await supabase
+        .from('hitos')
+        .update({ completado: true })
+        .eq('id', hitoId);
+      
+      // Log de auditoría - documento subido y hito completado
+      if (user) {
+        const hito = hitosProyecto.find(h => h.id === hitoId);
+        await logDocumentAction(
+          user,
+          'upload_document',
+          hitoId,
+          file.name,
+          'hito',
+          hitoId,
+          { proyecto_id: proyectoSeleccionadoId, hito_completado: true }
+        );
+      }
+      
+      toast.success('Documento subida y hito completado.');
+      
+      await refrescarProyectos();
+      
+    } catch (error) {
+      console.error('Error al subir documento:', error);
+      toast.error('No se pudo subir el documento: ' + (error as Error).message);
+    } finally {
+      setSubiendoDocumento(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const abrirSelectorArchivos = (hitoId: string) => {
+    if (!session) {
+      toast.error('Debes iniciar sesión para subir documentos');
+      return;
+    }
+    setHitoParaSubirDocumento(hitoId);
+    fileInputRef.current?.click();
+  };
+
+  const onSeleccionarArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && hitoParaSubirDocumento) {
+      handleSubirDocumento(hitoParaSubirDocumento, file);
+    }
+  };
+
+  const handleEliminarDocumento = async (documentoId: string, documentoUrl: string) => {
+    if (!isAdmin) {
+      toast.error('Solo los administradores pueden eliminar documentos');
+      return;
+    }
+    try {
+      const { error: dbError } = await supabase
+        .from('documentos')
+        .delete()
+        .eq('id', documentoId);
+        
+      if (dbError) {
+        throw dbError;
+      }
+      
+      const urlParts = documentoUrl.split('/');
+      const filePath = urlParts.slice(-2).join('/');
+      
+      await supabase.storage
+        .from('Documentos')
+        .remove([filePath]);
+        
+      toast.success('Documento eliminado.');
+      
+      await refrescarProyectos();
+      
+    } catch (error) {
+      console.error('Error al eliminar documento:', error);
+      toast.error('No se pudo eliminar el documento.');
+    }
+  };
+
   const toggleHitoCompletado = async (hitoId: string, completadoActual: boolean) => {
+    if (!session) {
+      toast.error('Debes iniciar sesión para actualizar hitos');
+      return;
+    }
     const { error } = await supabase
       .from('hitos')
       .update({ completado: !completadoActual })
@@ -55,12 +193,15 @@ export function ModuloGestion() {
       toast.error('No se pudo actualizar el estado del hito.');
     } else {
       toast.success('Estado del hito actualizado.');
-      // El AppContext se refrescará automáticamente
+      await refrescarProyectos();
     }
   };
 
-  // <--- NUEVA IMPLEMENTACIÓN: cambiarEstadoProyecto interactúa directamente con Supabase
   const cambiarEstadoProyecto = async (proyectoId: string, nuevoEstado: EstadoProyecto) => {
+    if (!isAdmin) {
+      toast.error('Solo los administradores pueden cambiar el estado');
+      return;
+    }
     const { error } = await supabase
       .from('proyectos')
       .update({ estado: nuevoEstado })
@@ -71,16 +212,20 @@ export function ModuloGestion() {
       toast.error('No se pudo actualizar el estado del proyecto.');
     } else {
       toast.success('Estado del proyecto actualizado.');
-      // El AppContext se refrescará automáticamente
+      await refrescarProyectos();
     }
   };
 
-
   const descargarReporte = () => {
     alert('Generando reporte PDF... (funcionalidad en desarrollo)');
-    // Aquí iría la lógica para generar el PDF.
-    // Esto implicaría una función que consulte los datos de Supabase,
-    // los formatee y genere un PDF (ej. con jsPDF o similar, o una función de Supabase Edge Function)
+  };
+
+  const toggleFormularioHito = () => {
+    if (!session) {
+      toast.error('Debes iniciar sesión para crear hitos');
+      return;
+    }
+    setMostrarFormularioHito(!mostrarFormularioHito);
   };
 
   if (loading) {
@@ -91,7 +236,7 @@ export function ModuloGestion() {
     );
   }
 
-  if (!proyecto) { // Ahora verificamos después de cargar
+  if (!proyecto) {
     return (
       <div className="text-gray-600 p-8">
         No hay proyectos disponibles o seleccionado.
@@ -100,26 +245,66 @@ export function ModuloGestion() {
   }
 
   return (
-    <div className="p-8"> {/* Añadido padding para que no esté pegado al borde */}
-      {/* Header */}
+    <div className="p-8"> 
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={onSeleccionarArchivo}
+        className="hidden"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif"
+      />
+      
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-gray-900">Gestión y Trazabilidad</h2>
+          <h2 className="text-gray-900">Gestion y Trazabilidad</h2>
           <p className="text-gray-600">Seguimiento transparente de proyectos y uso de fondos</p>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Botón Cambiar Estado */}
+          {/* Indicador de rol */}
+          {session && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full">
+              {isAdmin ? (
+                <>
+                  <Crown className="w-4 h-4 text-yellow-500" />
+                  <span className="text-sm text-gray-700">Administrador</span>
+                </>
+              ) : (
+                <>
+                  <User className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-gray-700">Usuario</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Botón cambiar estado - solo admin */}
           <div className="relative">
             <button
-              onClick={() => setMostrarCambioEstado(v => !v)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              onClick={() => {
+                if (!session) {
+                  toast.error('Debes iniciar sesión');
+                  return;
+                }
+                if (!isAdmin) {
+                  toast.error('Solo administradores pueden cambiar estados');
+                  return;
+                }
+                setMostrarCambioEstado(v => !v);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                isAdmin 
+                  ? 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50' 
+                  : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+              disabled={!isAdmin}
             >
               <Pencil className="w-4 h-4" />
               Cambiar estado
+              {!isAdmin && <Lock className="w-3 h-3" />}
             </button>
 
-            {mostrarCambioEstado && (
+            {mostrarCambioEstado && isAdmin && (
               <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-20 w-56">
                 <label className="block text-xs text-gray-600 mb-2">Nuevo estado</label>
                 <select
@@ -147,7 +332,6 @@ export function ModuloGestion() {
             )}
           </div>
 
-          {/* Botón Descargar Reporte */}
           <button
             onClick={descargarReporte}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
@@ -158,11 +342,10 @@ export function ModuloGestion() {
         </div>
       </div>
 
-      {/* Selector de proyecto */}
       <div className="bg-white p-4 rounded-lg border border-gray-200 mb-6">
         <label className="block text-gray-700 mb-2">Seleccionar Proyecto</label>
         <select
-          value={proyectoSeleccionadoId} // <--- CORREGIDO: Usar proyectoSeleccionadoId
+          value={proyectoSeleccionadoId}
           onChange={(e) => setProyectoSeleccionadoId(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
@@ -174,7 +357,6 @@ export function ModuloGestion() {
         </select>
       </div>
 
-      {/* Resumen del proyecto */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <div className="text-gray-600 mb-1">Monto Aportado</div>
@@ -196,28 +378,42 @@ export function ModuloGestion() {
 
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <div className="text-gray-600 mb-1">Estado del Proyecto</div>
-          <div className="text-gray-900">{proyecto.estado}</div>
-          <div className="text-gray-500">última actualización hoy</div>
+          <div className="text-gray-900 capitalize">{proyecto.estado.replace('_', ' ')}</div>
+          <div className="text-gray-500">ultima actualizacion hoy</div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Línea de tiempo */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-gray-900">Línea de Tiempo de Hitos</h3>
+              <h3 className="text-gray-900">Linea de Tiempo de Hitos</h3>
               <button
-                onClick={() => setMostrarFormularioHito(!mostrarFormularioHito)} // <--- CORREGIDO
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                onClick={toggleFormularioHito}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  session 
+                    ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                    : 'bg-gray-400 text-white cursor-not-allowed'
+                }`}
+                disabled={!puedeEditar}
               >
                 <Plus className="w-4 h-4" />
-                Nuevo Hito
+                {puedeEditar ? 'Nuevo Hito' : 'Solo el creador'}
               </button>
             </div>
 
-            {mostrarFormularioHito && ( // <--- CORREGIDO
-              <div className="mb-6 pb-6 border-b">
+            {/* Banner de requiere permisos */}
+            {!puedeEditar && (
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+                <Lock className="w-5 h-5 text-yellow-600" />
+                <p className="text-sm text-yellow-700">
+                  Solo el creador del proyecto o administradores pueden gestionar hitos
+                </p>
+              </div>
+            )}
+
+            {mostrarFormularioHito && puedeEditar && (
+              <div className="mb-6 pb-6 border-b bg-gray-50 rounded-lg p-4">
                 <FormularioHito
                   proyectoId={proyecto.id}
                   onGuardar={handleGuardarHito}
@@ -240,8 +436,11 @@ export function ModuloGestion() {
 
                     <div className="flex gap-4">
                       <button
-                        onClick={() => toggleHitoCompletado(hito.id, hito.completado)} // <--- CORREGIDO
-                        className="flex-shrink-0 relative z-10"
+                        onClick={() => toggleHitoCompletado(hito.id, hito.completado)}
+                        className={`flex-shrink-0 relative z-10 ${
+                          puedeEditar ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                        }`}
+                        disabled={!puedeEditar}
                       >
                         {hito.completado ? (
                           <CheckCircle className="w-10 h-10 text-green-500 bg-white" />
@@ -259,7 +458,6 @@ export function ModuloGestion() {
                           </h4>
                           <div className="flex items-center gap-2 text-gray-500">
                             <Calendar className="w-4 h-4" />
-                            {/* <--- CORREGIDO: Manejar fecha como string o Date object */}
                             <span>{new Date(hito.fecha).toLocaleDateString()}</span>
                           </div>
                         </div>
@@ -268,26 +466,26 @@ export function ModuloGestion() {
                           {hito.descripcion}
                         </p>
 
-                        {/* <--- VERIFICAR: hito.documentos no está en tu interfaz Hito de types/index.ts */}
-                        {/* Si Hito no tiene 'documentos', esto causará un error de TypeScript/runtime */}
-                        {/* Puedes agregarlo a la interfaz Hito o eliminar este bloque si no aplica */}
-                        {hito.documentos && hito.documentos.length > 0 && ( // <--- Agregado check si existe hito.documentos
-                          <div className="space-y-2">
-                            <div className="text-gray-700">Documentos adjuntos:</div>
-                            {hito.documentos.map((doc) => (
-                              <div key={doc.id} className="flex items-center gap-2 text-gray-600">
-                                <FileText className="w-4 h-4" />
-                                <span>{doc.nombre}</span>
-                                <span className="text-gray-400">• {new Date(doc.fechaSubida).toLocaleDateString()}</span>
-                              </div>
-                            ))}
-                          </div>
+                        {hito.documentos && hito.documentos.length > 0 && (
+                          <DocumentosHito 
+                            documentos={hito.documentos} 
+                            onEliminar={handleEliminarDocumento}
+                            isAdmin={isAdmin}
+                          />
                         )}
 
                         {!hito.completado && (
-                          <button className="mt-3 flex items-center gap-2 text-purple-600 hover:text-purple-700">
-                            <Upload className="w-4 h-4" />
-                            Subir documento
+                          <button 
+                            onClick={() => abrirSelectorArchivos(hito.id)}
+                            disabled={subiendoDocumento || !session}
+                            className="mt-3 flex items-center gap-2 text-purple-600 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {subiendoDocumento ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Upload className="w-4 h-4" />
+                            )}
+                            {session ? 'Subir documento' : 'Inicia sesión para subir'}
                           </button>
                         )}
                       </div>
@@ -300,7 +498,6 @@ export function ModuloGestion() {
           </div>
         </div>
 
-        {/* Panel lateral */}
         <div className="space-y-6">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-gray-900 mb-4">Progreso General</h3>
@@ -319,7 +516,6 @@ export function ModuloGestion() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-600">Financiamiento</span>
                 <span className="text-gray-900">
-                  {/* <--- CORREGIDO: Asegurarse que montoRequerido no sea 0 para evitar division por cero */}
                   {proyecto.montoRequerido > 0 ? ((proyecto.montoRecaudado / proyecto.montoRequerido) * 100).toFixed(0) : 0}%
                 </span>
               </div>
@@ -343,7 +539,7 @@ export function ModuloGestion() {
                   <div key={aporte.id} className="p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-gray-900">{aporte.entidad}</span>
-                      <span className={`px-2 py-1 rounded text-white ${
+                      <span className={`px-2 py-1 rounded text-white text-xs ${
                         aporte.estado === 'aprobado' ? 'bg-green-500' :
                         aporte.estado === 'pendiente' ? 'bg-yellow-500' : 'bg-red-500'
                       }`}>
@@ -363,5 +559,58 @@ export function ModuloGestion() {
         </div>
       </div>
     </div>
+  );
+}
+
+function DocumentosHito({ documentos, onEliminar, isAdmin }: { documentos: Documento[], onEliminar: (id: string, url: string) => void, isAdmin: boolean }) {
+  if (documentos.length === 0) return null;
+  
+  return (
+    <div className="space-y-2 mt-3">
+      <div className="text-gray-700 text-sm font-medium">Documentos adjuntos:</div>
+      {documentos.map((doc) => (
+        <div key={doc.id} className="flex items-center gap-2 text-sm bg-gray-100 p-2 rounded">
+          <FileText className="w-4 h-4 text-gray-500" />
+          <a 
+            href={doc.url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-purple-600 hover:text-purple-700 underline flex-1"
+          >
+            {doc.nombre}
+          </a>
+          <span className="text-gray-400 text-xs">{new Date(doc.fechaSubida || Date.now()).toLocaleDateString()}</span>
+          {isAdmin && (
+            <button 
+              onClick={() => onEliminar(doc.id, doc.url)}
+              className="text-red-500 hover:text-red-700"
+              title="Eliminar documento"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function User(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width="24" 
+      height="24" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
   );
 }
