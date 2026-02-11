@@ -84,9 +84,9 @@ export function ModuloGestion() {
           nombre: file.name,
           tipo: file.type,
           url: publicUrl,
-          proyectoid: proyectoSeleccionadoId,
-          hitoid: hitoId,
-          fechasubida: new Date().toLocaleDateString('es-CO'),
+          proyecto_id: proyectoSeleccionadoId,
+          hito_id: hitoId,
+          fechasubida: new Date().toISOString(),
           storage_path: `hitos/${fileName}`
         });
         

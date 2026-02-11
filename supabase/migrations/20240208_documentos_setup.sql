@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS documentos (
   tipo TEXT NOT NULL,
   hito_id UUID REFERENCES hitos(id) ON DELETE CASCADE,
   proyecto_id UUID REFERENCES proyectos(id) ON DELETE CASCADE,
+  fechasubida TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  storage_path TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
