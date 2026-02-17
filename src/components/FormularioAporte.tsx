@@ -103,8 +103,8 @@ export function FormularioAporte({ proyecto, onGuardar }: FormularioAporteProps)
       console.log('FormularioAporte.tsx - Wompi response:', response);
       console.log('FormularioAporte.tsx - id:', response.id);
       
-      // Wompi sandbox no siempre devuelve redirect_url, lo construimos manualmente
-      const redirectUrl = response.redirect_url || `https://checkout.wompi.co/payment-links/${response.id}`;
+      // Usamos la URL de redirect que devuelve Wompi, o construimos la URL de producción
+      const redirectUrl = response.redirect_url || `https://checkout.wompi.co/l/${response.id}`;
       const reference = response.reference || response.id;
       
       console.log('FormularioAporte.tsx - redirect_url:', redirectUrl);
@@ -294,52 +294,8 @@ export function FormularioAporte({ proyecto, onGuardar }: FormularioAporteProps)
             )}
           </div>
 
-          {/* Métodos de pago (solo para pagos monetarios) */}
-          {esPagoMonetario && (
-            <div>
-              <label className="block text-gray-700 mb-2">Método de Pago *</label>
-              <div className="grid grid-cols-3 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('PSE')}
-                  className={`p-4 border rounded-lg flex flex-col items-center gap-2 transition-colors ${
-                    paymentMethod === 'PSE' 
-                      ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <Landmark className="w-8 h-8" />
-                  <span className="text-sm font-medium">PSE</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('CARD')}
-                  className={`p-4 border rounded-lg flex flex-col items-center gap-2 transition-colors ${
-                    paymentMethod === 'CARD' 
-                      ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <CreditCard className="w-8 h-8" />
-                  <span className="text-sm font-medium">Tarjeta</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('NEQUI')}
-                  className={`p-4 border rounded-lg flex flex-col items-center gap-2 transition-colors ${
-                    paymentMethod === 'NEQUI' 
-                      ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <Smartphone className="w-8 h-8" />
-                  <span className="text-sm font-medium">Nequi</span>
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Nota: El método de pago se selecciona en el checkout de Wompi */}
+          {/* Métodos de pago eliminados - Wompi payment links ya preguntan por el método */}
 
           {/* Observaciones */}
           <div>
@@ -375,16 +331,15 @@ export function FormularioAporte({ proyecto, onGuardar }: FormularioAporteProps)
               </div>
               {esPagoMonetario && (
                 <>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Método:</span>
-                    <span className="text-gray-900">{paymentMethod}</span>
-                  </div>
                   <div className="flex justify-between border-t pt-2">
                     <span className="text-gray-900 font-medium">Monto del aporte:</span>
                     <span className="text-blue-600 font-bold text-lg">
                       ${formData.monto ? parseInt(formData.monto).toLocaleString() : '0'} COP
                     </span>
                   </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    El método de pago se seleccionará en el checkout de Wompi
+                  </p>
                 </>
               )}
             </div>
@@ -445,7 +400,7 @@ export function FormularioAporte({ proyecto, onGuardar }: FormularioAporteProps)
                   Procesando...
                 </span>
               ) : esPagoMonetario ? (
-                `Pagar con ${paymentMethod === 'PSE' ? 'PSE' : paymentMethod === 'CARD' ? 'Tarjeta' : 'Nequi'}`
+                'Proceder al pago'
               ) : (
                 'Confirmar Aporte'
               )}

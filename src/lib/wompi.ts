@@ -9,7 +9,7 @@ import type {
   TaxInfo,
 } from '../types/wompi';
 
-const WOMPI_API_URL = 'https://sandbox.wompi.co/v1';
+const WOMPI_API_URL = 'https://production.wompi.co/v1';
 const PUBLIC_KEY = import.meta.env.VITE_WOMPI_PUBLIC_KEY;
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;

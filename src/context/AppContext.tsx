@@ -95,17 +95,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (proyectosError) {
       console.error('Error cargando proyectos:', proyectosError);
     } else {
-      // Transformar datos de snake_case a camelCase
-      const proyectosTransformados = (proyectosData || []).map(p => ({
-        ...p,
-        montoRequerido: p.montorequerido || 0,
-        montoRecaudado: p.monto_recaudado || 0,
-        poblacionBeneficiada: p.poblacionbeneficiada || 0,
-        empleosGenerados: p.empleosgenerados || 0,
-        fechaCreacion: p.fechacreacion || p.created_at,
-        personaId: p.persona_id
+      // Cargar los nombres de los creadores desde profiles
+      const proyectosWithCreators = await Promise.all((proyectosData || []).map(async (p) => {
+        let creatorName = 'Usuario';
+        
+        if (p.user_id) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', p.user_id)
+            .single();
+          
+          if (profileData) {
+            creatorName = profileData.full_name || profileData.email || 'Usuario';
+          }
+        }
+        
+        return {
+          ...p,
+          montoRequerido: p.montorequerido || 0,
+          montoRecaudado: p.monto_recaudado || 0,
+          poblacionBeneficiada: p.poblacionbeneficiada || 0,
+          empleosGenerados: p.empleosgenerados || 0,
+          fechaCreacion: p.fechacreacion || p.created_at,
+          personaId: p.persona_id,
+          creatorName
+        };
       }));
-      setProyectos(proyectosTransformados as Proyecto[]);
+      
+      setProyectos(proyectosWithCreators as Proyecto[]);
     }
 
     // Cargar Personas

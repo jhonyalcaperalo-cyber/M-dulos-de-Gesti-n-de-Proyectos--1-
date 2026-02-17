@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Filter, Eye, MapPin, Users, DollarSign, Lock, X } from 'lucide-react';
+import { Plus, Filter, Eye, MapPin, Users, DollarSign, Lock, X, User } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { DetalleProyecto } from './DetalleProyecto';
@@ -105,135 +105,22 @@ export function ModuloCaracterizacion() {
     );
   }
 
-  // Determinar si mostrar la lista de proyectos
-  const mostrarListaProyectos = proyectosFiltrados.length > 0;
-
-  return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">Caracterización y Oferta</h2>
-        <p className="text-gray-600 mt-1">
-          Gestiona y visualiza los proyectos sociales registrados en la plataforma
-        </p>
-      </div>
-
-      <div className="flex justify-between items-center mb-6">
-        {/* Filtro por estado */}
-        <div className="flex items-center gap-3">
-          <Filter className="w-5 h-5 text-gray-500" />
-          <label className="text-gray-700 font-medium">Filtrar por estado:</label>
-          <select
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value as EstadoProyecto | 'todos')}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="todos">Todos los estados</option>
-            {estados.map(estado => (
-              <option key={estado} value={estado}>
-                {estado.charAt(0).toUpperCase() + estado.slice(1).replace('_', ' ')}
-              </option>
-            ))}
-          </select>
-          <span className="text-gray-600">
-            {proyectosFiltrados.length} proyecto{proyectosFiltrados.length !== 1 ? 's' : ''}
-          </span>
+  // Cuando se muestra el formulario, no mostrar la lista de proyectos
+  if (mostrarFormulario) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-900">Crear Nuevo Proyecto</h2>
+          <p className="text-gray-600 mt-1">
+            Completa los datos del proyecto social
+          </p>
         </div>
 
-        <button
-          onClick={() => {
-            if (!user) {
-              toast.error('Debes iniciar sesión para crear proyectos');
-              return;
-            }
-            setMostrarFormulario(true);
-          }}
-          className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors ${
-            user ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'
-          }`}
-          disabled={!user}
-        >
-          <Plus className="w-5 h-5" />
-          {user ? 'Crear Nuevo Proyecto' : 'Inicia sesión para crear'}
-        </button>
-      </div>
-
-      {/* Grid de proyectos */}
-      {mostrarListaProyectos ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {proyectosFiltrados.map((proyecto) => (
-            <div
-              key={proyecto.id}
-              className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getEstadoColor(proyecto.estado)}`}>
-                    {proyecto.estado.charAt(0).toUpperCase() + proyecto.estado.slice(1).replace('_', ' ')}
-                  </span>
-                  <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
-                    {proyecto.categoria}
-                  </span>
-                </div>
-
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{proyecto.nombre}</h3>
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{proyecto.descripcion}</p>
-
-                <div className="space-y-2 mb-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400" />
-                    <span>{proyecto.municipio}, {proyecto.departamento}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-gray-400" />
-                    <span>{proyecto.poblacionBeneficiada} beneficiarios</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-gray-400" />
-                    <span>${proyecto.montoRequerido?.toLocaleString() || '0'} COP</span>
-                  </div>
-                </div>
-
-                {/* Progreso de recaudación */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-1 text-sm">
-                    <span className="text-gray-600">Recaudado</span>
-                    <span className="text-gray-900 font-medium">
-                      ${proyecto.montoRecaudado?.toLocaleString() || '0'}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-600 h-2 rounded-full transition-all"
-                      style={{
-                        width: `${Math.min(((proyecto.montoRecaudado || 0) / (proyecto.montoRequerido || 1)) * 100, 100)}%`
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleVerDetalle(proyecto)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <Eye className="w-4 h-4" />
-                  Ver Detalle
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-          <p className="text-gray-600">No hay proyectos registrados. Haz clic en "Crear Nuevo Proyecto" para comenzar.</p>
-        </div>
-      )}
-
-      {/* Formulario para crear proyecto */}
-      {mostrarFormulario && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        {/* Formulario para crear proyecto */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Crear Nuevo Proyecto</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Formulario de Proyecto</h3>
             <button
               onClick={() => setMostrarFormulario(false)}
               className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
@@ -395,6 +282,136 @@ export function ModuloCaracterizacion() {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar lista de proyectos (cuando no se está en detalle ni en formulario)
+  return (
+    <div className="p-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-gray-900">Caracterización y Oferta</h2>
+        <p className="text-gray-600 mt-1">
+          Gestiona y visualiza los proyectos sociales registrados en la plataforma
+        </p>
+      </div>
+
+      <div className="flex justify-between items-center mb-6">
+        {/* Filtro por estado */}
+        <div className="flex items-center gap-3">
+          <Filter className="w-5 h-5 text-gray-500" />
+          <label className="text-gray-700 font-medium">Filtrar por estado:</label>
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value as EstadoProyecto | 'todos')}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="todos">Todos los estados</option>
+            {estados.map(estado => (
+              <option key={estado} value={estado}>
+                {estado.charAt(0).toUpperCase() + estado.slice(1).replace('_', ' ')}
+              </option>
+            ))}
+          </select>
+          <span className="text-gray-600">
+            {proyectosFiltrados.length} proyecto{proyectosFiltrados.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        <button
+          onClick={() => {
+            if (!user) {
+              toast.error('Debes iniciar sesión para crear proyectos');
+              return;
+            }
+            setMostrarFormulario(true);
+          }}
+          className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors ${
+            user ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'
+          }`}
+          disabled={!user}
+        >
+          <Plus className="w-5 h-5" />
+          {user ? 'Crear Nuevo Proyecto' : 'Inicia sesión para crear'}
+        </button>
+      </div>
+
+      {/* Grid de proyectos */}
+      {proyectosFiltrados.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {proyectosFiltrados.map((proyecto) => (
+            <div
+              key={proyecto.id}
+              className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+            >
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getEstadoColor(proyecto.estado)}`}>
+                    {proyecto.estado.charAt(0).toUpperCase() + proyecto.estado.slice(1).replace('_', ' ')}
+                  </span>
+                  <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
+                    {proyecto.categoria}
+                  </span>
+                </div>
+
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{proyecto.nombre}</h3>
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{proyecto.descripcion}</p>
+
+                <div className="space-y-2 mb-4 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-gray-400" />
+                    <span>{proyecto.municipio}, {proyecto.departamento}</span>
+                  </div>
+                  {proyecto.creatorName && (
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-gray-400" />
+                      <span>Creador: {proyecto.creatorName}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-gray-400" />
+                    <span>{proyecto.poblacionBeneficiada} beneficiarios</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-gray-400" />
+                    <span>${proyecto.montoRequerido?.toLocaleString() || '0'} COP</span>
+                  </div>
+                </div>
+
+                {/* Progreso de recaudación */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1 text-sm">
+                    <span className="text-gray-600">Recaudado</span>
+                    <span className="text-gray-900 font-medium">
+                      ${proyecto.montoRecaudado?.toLocaleString() || '0'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-green-600 h-2 rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(((proyecto.montoRecaudado || 0) / (proyecto.montoRequerido || 1)) * 100, 100)}%`
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleVerDetalle(proyecto)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                  Ver Detalle
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+          <p className="text-gray-600">No hay proyectos registrados. Haz clic en "Crear Nuevo Proyecto" para comenzar.</p>
         </div>
       )}
     </div>

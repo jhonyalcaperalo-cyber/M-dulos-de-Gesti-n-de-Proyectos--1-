@@ -23,7 +23,7 @@ export function ModuloGestion() {
   const isAdmin = user?.role === 'admin';
   const proyecto = proyectos.find(p => p.id === proyectoSeleccionadoId);
   const esCreador = user?.id === proyecto?.user_id;
-  const puedeEditar = isAdmin || esCreador || session;
+  const puedeEditar = isAdmin || esCreador;
 
   useEffect(() => {
     if (!loading && proyectos.length > 0 && !proyectoSeleccionadoId) {
@@ -84,8 +84,8 @@ export function ModuloGestion() {
           nombre: file.name,
           tipo: file.type,
           url: publicUrl,
-          proyecto_id: proyectoSeleccionadoId,
-          hito_id: hitoId,
+          proyectoid: proyectoSeleccionadoId,
+          hitoid: hitoId,
           fechasubida: new Date().toISOString(),
           storage_path: `hitos/${fileName}`
         });
@@ -223,6 +223,10 @@ export function ModuloGestion() {
   const toggleFormularioHito = () => {
     if (!session) {
       toast.error('Debes iniciar sesión para crear hitos');
+      return;
+    }
+    if (!esCreador && !isAdmin) {
+      toast.error('Solo el creador del proyecto puede agregar hitos');
       return;
     }
     setMostrarFormularioHito(!mostrarFormularioHito);

@@ -4,7 +4,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
-const WOMPI_API_URL = 'https://sandbox.wompi.co/v1';
+const WOMPI_API_URL = 'https://production.wompi.co/v1';
 
 // CORS headers
 const corsHeaders = {

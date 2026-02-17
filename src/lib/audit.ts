@@ -33,9 +33,9 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
     const { error } = await supabase.from('audit_log').insert({
       user_id: entry.user_id,
       user_email: entry.user_email,
-      action: entry.action,
-      entity_type: entry.entity_type,
-      entity_id: entry.entity_id,
+      accion: entry.action,
+      tabla: entry.entity_type,
+      registro_id: entry.entity_id,
       details: entry.details,
       ip_address: entry.ip_address,
     });

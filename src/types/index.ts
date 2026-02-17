@@ -67,6 +67,7 @@ export interface Proyecto {
   poblacionBeneficiada: number;
   empleosGenerados: number;
   user_id: string | null;  // ID del usuario que creó el proyecto
+  creatorName?: string;    // Nombre del creador del proyecto
   // Campos para datos relacionados (vienen del JOIN en Supabase)
   hitos?: Hito[];
   aportes?: Aporte[];

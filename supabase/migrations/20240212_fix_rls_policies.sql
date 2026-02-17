@@ -1,79 +1,95 @@
--- Migration: Fix RLS policies for hitos, proyectos, and documentos tables
+-- Migration: Fix RLS policies for authenticated users to upload documents
+-- Execute this SQL in Supabase SQL Editor
 
--- Ensure public schema access
-GRANT USAGE ON SCHEMA public TO authenticated;
+-- First, drop ALL existing policies on documentos table
+DO $$
+DECLARE
+    pol TEXT;
+BEGIN
+    FOR pol IN SELECT policyname FROM pg_policies WHERE tablename = 'documentos' AND schemaname = 'public' LOOP
+        EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(pol) || ' ON public.documentos';
+    END LOOP;
+END $$;
 
--- Fix documentos table policies (drop existing and create new)
-DROP POLICY IF EXISTS documentos_select_auth ON documentos;
-DROP POLICY IF EXISTS documentos_insert_auth ON documentos;
-DROP POLICY IF EXISTS documentos_select ON documentos;
-DROP POLICY IF EXISTS documentos_insert ON documentos;
+-- First, drop ALL existing policies on hitos table
+DO $$
+DECLARE
+    pol TEXT;
+BEGIN
+    FOR pol IN SELECT policyname FROM pg_policies WHERE tablename = 'hitos' AND schemaname = 'public' LOOP
+        EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(pol) || ' ON public.hitos';
+    END LOOP;
+END $$;
 
-ALTER TABLE documentos ENABLE ROW LEVEL SECURITY;
+-- First, drop ALL existing policies on proyectos table
+DO $$
+DECLARE
+    pol TEXT;
+BEGIN
+    FOR pol IN SELECT policyname FROM pg_policies WHERE tablename = 'proyectos' AND schemaname = 'public' LOOP
+        EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(pol) || ' ON public.proyectos';
+    END LOOP;
+END $$;
 
-CREATE POLICY "Authenticated users can view documentos"
-  ON documentos FOR SELECT
-  TO authenticated
-  USING (true);
-
-CREATE POLICY "Authenticated users can insert documentos"
-  ON documentos FOR INSERT
+-- Create RLS policies for documentos table
+CREATE POLICY "Auth users can insert documentos"
+  ON public.documentos FOR INSERT
   TO authenticated
   WITH CHECK (true);
 
--- Ensure hitos table has proper RLS policies
-ALTER TABLE hitos ENABLE ROW LEVEL SECURITY IF NOT EXISTS;
-
-DROP POLICY IF EXISTS hitos_select_auth ON hitos;
-DROP POLICY IF EXISTS hitos_update_auth ON hitos;
-
-CREATE POLICY "Authenticated users can view hitos"
-  ON hitos FOR SELECT
+CREATE POLICY "Auth users can select documentos"
+  ON public.documentos FOR SELECT
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can update hitos"
-  ON hitos FOR UPDATE
+-- Create RLS policies for hitos table
+CREATE POLICY "Auth users can update hitos"
+  ON public.hitos FOR UPDATE
   TO authenticated
   USING (true)
   WITH CHECK (true);
 
--- Ensure proyectos table has proper RLS policies
-ALTER TABLE proyectos ENABLE ROW LEVEL SECURITY IF NOT EXISTS;
-
-DROP POLICY IF EXISTS proyectos_select_auth ON proyectos;
-DROP POLICY IF EXISTS proyectos_update_auth ON proyectos;
-
-CREATE POLICY "Authenticated users can view proyectos"
-  ON proyectos FOR SELECT
+CREATE POLICY "Auth users can select hitos"
+  ON public.hitos FOR SELECT
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can update proyectos"
-  ON proyectos FOR UPDATE
+-- Create RLS policies for proyectos table
+CREATE POLICY "Auth users can select proyectos"
+  ON public.proyectos FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Auth users can insert proyectos"
+  ON public.proyectos FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Auth users can update proyectos"
+  ON public.proyectos FOR UPDATE
   TO authenticated
   USING (true)
   WITH CHECK (true);
 
 -- Fix storage policies for Documentos bucket
+DROP POLICY IF EXISTS "Anyone can upload" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can view" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can delete" ON storage.objects;
 DROP POLICY IF EXISTS "Ver documentos" ON storage.objects;
 DROP POLICY IF EXISTS "Subir documentos" ON storage.objects;
 DROP POLICY IF EXISTS "Eliminar documentos" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can view" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can upload" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can delete" ON storage.objects;
 
-CREATE POLICY "Authenticated users can view documents"
+CREATE POLICY "Auth users can view storage"
   ON storage.objects FOR SELECT
   TO authenticated
   USING (bucket_id = 'Documentos');
 
-CREATE POLICY "Authenticated users can upload documents"
+CREATE POLICY "Auth users can upload storage"
   ON storage.objects FOR INSERT
   TO authenticated
   WITH CHECK (bucket_id = 'Documentos');
 
-CREATE POLICY "Authenticated users can delete documents"
+CREATE POLICY "Auth users can delete storage"
   ON storage.objects FOR DELETE
   TO authenticated
   USING (bucket_id = 'Documentos');
